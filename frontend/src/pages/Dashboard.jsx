@@ -564,13 +564,17 @@ function PredictionForm({ user, onResults }) {
   );
 }
 
-function CollegeCard({ row, index, typeConfig }) {
+function CollegeCard({ row, index, typeConfig, onClick }) {
   const cfg = typeConfig[row.category] || typeConfig.Dream;
 
   return (
     <div
       data-testid={`college-card-${index}`}
-      className={`relative rounded-2xl border-2 p-5 bg-white hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 ${cfg.border}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); }}
+      className={`group relative rounded-2xl border-2 p-5 bg-white hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer ${cfg.border}`}
     >
       {/* Top row: chance badge + probability */}
       <div className="flex items-start justify-between mb-3">
@@ -618,11 +622,24 @@ function CollegeCard({ row, index, typeConfig }) {
       {row.fees && row.fees !== "N/A" && (
         <p className="text-xs text-slate-400 mt-1.5 truncate">{row.fees}</p>
       )}
+
+      {/* View Trend CTA */}
+      <div
+        data-testid={`view-trend-${index}`}
+        className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs"
+      >
+        <span className="flex items-center gap-1.5 text-slate-500 group-hover:text-blue-600 transition-colors font-medium">
+          <TrendingUp size={12} />
+          View 2023–2025 Trend
+        </span>
+        <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
+      </div>
     </div>
   );
 }
 
-function PredictionResults({ results, user, onPayment, examType }) {
+function PredictionResults({ results, user, onPayment, examType, predForm }) {
+  const [selectedCollege, setSelectedCollege] = useState(null);
   if (!results) return null;
 
   const typeConfig = {
@@ -754,7 +771,13 @@ function PredictionResults({ results, user, onPayment, examType }) {
             {/* Grid of cards */}
             <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 rounded-b-xl border ${cfg.sectionBorder} bg-white/60`}>
               {colleges.map((row, i) => (
-                <CollegeCard key={i} row={row} index={`${key}-${i}`} typeConfig={typeConfig} />
+                <CollegeCard
+                  key={i}
+                  row={row}
+                  index={`${key}-${i}`}
+                  typeConfig={typeConfig}
+                  onClick={() => setSelectedCollege(row)}
+                />
               ))}
             </div>
           </div>
@@ -791,6 +814,18 @@ function PredictionResults({ results, user, onPayment, examType }) {
             <p className="text-slate-400 text-xs mt-3">One-time payment • No subscription • Instant access</p>
           </div>
         </div>
+      )}
+
+      {/* Trend Modal */}
+      {selectedCollege && (
+        <TrendModal
+          college={selectedCollege}
+          examType={examType}
+          category={predForm?.category}
+          gender={predForm?.gender}
+          quota={predForm?.quota}
+          onClose={() => setSelectedCollege(null)}
+        />
       )}
     </div>
   );
@@ -932,6 +967,7 @@ export default function Dashboard() {
   const [predictions, setPredictions] = useState(null);
   const [predForm, setPredForm] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [savedColleges, setSavedColleges] = useState([]);
 
   const handleLogout = async () => {
@@ -942,7 +978,7 @@ export default function Dashboard() {
   const handlePaymentSuccess = async () => {
     setShowPayment(false);
     await refreshUser();
-    alert("Premium access unlocked! Welcome to Hynexs Premium.");
+    setShowPaymentSuccess(true);
   };
 
   const overview = (
@@ -998,6 +1034,7 @@ export default function Dashboard() {
           results={predictions}
           user={user}
           examType={predForm?.exam_type}
+          predForm={predForm}
           onPayment={() => setShowPayment(true)}
         />
       )}
@@ -1140,6 +1177,62 @@ export default function Dashboard() {
           onClose={() => setShowPayment(false)}
           onSuccess={handlePaymentSuccess}
         />
+      )}
+
+      {showPaymentSuccess && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl animate-fade-in" data-testid="payment-success-modal">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} className="text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Welcome to Premium!
+              </h3>
+              <p className="text-slate-500 text-sm">
+                Your ₹50 access is now active. A confirmation email has been sent to <strong>{user?.email}</strong>.
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-5">
+              <p className="text-sm font-bold text-green-800 mb-2">What's unlocked:</p>
+              <div className="space-y-1">
+                {[
+                  "All college predictions (Safe / Target / Dream)",
+                  "Full AI Counseling sessions",
+                  "2023–2025 cutoff trends + 2026 projections",
+                  "Personalized counseling reports",
+                ].map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-slate-700">
+                    <CheckCircle size={12} className="text-green-500 flex-shrink-0" />
+                    {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <a
+              href="https://chat.whatsapp.com/F3lEAtKrFLcJ5Fcgc3xUu5"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="join-whatsapp-btn"
+              className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors mb-3 text-sm"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/>
+              </svg>
+              Join WhatsApp Community
+            </a>
+
+            <button
+              onClick={() => setShowPaymentSuccess(false)}
+              data-testid="success-continue-btn"
+              className="w-full py-2.5 border border-slate-200 text-slate-600 text-sm rounded-xl hover:bg-slate-50 transition-colors font-medium"
+            >
+              Continue to Dashboard
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

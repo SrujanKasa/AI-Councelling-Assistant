@@ -1,30 +1,61 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const AuthContext = createContext(null);
 
+function extractSessionIdFromHash() {
+  // URL fragment: #session_id=XXXX
+  if (typeof window === "undefined") return null;
+  const hash = window.location.hash || "";
+  const m = hash.match(/session_id=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const oauthProcessed = useRef(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      axios
-        .get(`${API}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => setUser(res.data))
-        .catch(() => {
+    const init = async () => {
+      // OAuth callback: process session_id from URL fragment first
+      const sessionId = extractSessionIdFromHash();
+      if (sessionId && !oauthProcessed.current) {
+        oauthProcessed.current = true;
+        try {
+          const res = await axios.post(`${API}/auth/google-session`, { session_id: sessionId });
+          if (res.data.access_token) {
+            localStorage.setItem("access_token", res.data.access_token);
+          }
+          setUser(res.data.user);
+          // Clean the URL hash so it doesn't trigger again
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setLoading(false);
+          return;
+        } catch (e) {
+          // Fall through to normal auth check
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+      }
+
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        try {
+          const res = await axios.get(`${API}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setUser(res.data);
+        } catch {
           localStorage.removeItem("access_token");
           setUser(false);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setUser(false);
+        }
+      } else {
+        setUser(false);
+      }
       setLoading(false);
-    }
+    };
+    init();
   }, []);
 
   const login = async (email, password) => {

@@ -62,6 +62,12 @@ export default function Auth() {
     }
   };
 
+  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+  const handleGoogleLogin = () => {
+    const redirectUrl = window.location.origin + "/dashboard";
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
   return (
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
@@ -129,6 +135,30 @@ export default function Auth() {
               {error}
             </div>
           )}
+
+          {/* Continue with Google */}
+          <button
+            type="button"
+            data-testid="google-login-btn"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-white text-slate-800 font-medium py-3 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50 mb-4 text-sm"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16.51 8.18c0-.57-.05-1.13-.15-1.66H9v3.13h4.21a3.6 3.6 0 0 1-1.56 2.36v1.97h2.53c1.48-1.37 2.33-3.38 2.33-5.8z" fill="#4285F4"/>
+              <path d="M9 17c2.1 0 3.87-.7 5.18-1.9l-2.53-1.97c-.7.47-1.6.75-2.65.75-2.04 0-3.76-1.37-4.38-3.23H2v2.03A8 8 0 0 0 9 17z" fill="#34A853"/>
+              <path d="M4.62 10.65a4.8 4.8 0 0 1 0-3.07V5.55H2a8 8 0 0 0 0 6.9l2.62-1.8z" fill="#FBBC04"/>
+              <path d="M9 4.62c1.15 0 2.18.4 2.99 1.17l2.24-2.24A8 8 0 0 0 2 5.55l2.62 2.03C5.24 5.74 6.96 4.62 9 4.62z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
+          </button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-slate-500 text-xs">or</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
           {tab === "login" ? (
             <form onSubmit={handleLogin} className="space-y-4">
