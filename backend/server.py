@@ -17,7 +17,7 @@ from routes.counselor import router as counselor_router
 from routes.payments import router as payments_router
 from routes.admin import router as admin_router
 
-app = FastAPI(title="Hynexs Edu Counseller API")
+app = FastAPI(title="Hynexs AI Councellor API")
 
 mongo_url = os.environ["MONGO_URL"]
 db_name = os.environ["DB_NAME"]
@@ -41,7 +41,7 @@ api_router = APIRouter(prefix="/api")
 
 @api_router.get("/")
 async def root():
-    return {"message": "Hynexs Edu Counseller API", "status": "ok"}
+    return {"message": "Hynexs AI Councellor API", "status": "ok"}
 
 
 @api_router.get("/health")
@@ -146,7 +146,7 @@ async def startup():
     # Run CSV seeding in background
     import asyncio
     asyncio.create_task(seed_csv_data())
-    logging.info("Hynexs Edu Counseller API started")
+    logging.info("Hynexs AI Councellor API started")
 
 
 @app.on_event("shutdown")

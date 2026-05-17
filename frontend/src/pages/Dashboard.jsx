@@ -299,11 +299,14 @@ function Sidebar({ active, setActive, navigate, logout, user, open, setOpen }) {
         {/* Logo */}
         <div className="p-6 border-b border-white/5">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <Brain size={16} className="text-white" />
-            </div>
+            <img
+              src="/hynex-logo.jpeg"
+              alt="Hynex"
+              className="w-8 h-8 rounded-lg object-cover"
+              data-testid="sidebar-logo"
+            />
             <span className="font-bold text-white text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Hynexs Edu
+              Hynexs AI
             </span>
           </div>
         </div>
@@ -862,7 +865,7 @@ function PaymentModal({ onClose, onSuccess, user }) {
         key: key_id || process.env.REACT_APP_RAZORPAY_KEY_ID,
         amount,
         currency,
-        name: "Hynexs Edu Counseller",
+        name: "Hynexs AI Councellor",
         description: "Premium AI Counseling Access",
         order_id,
         handler: async (response) => {

@@ -29,11 +29,13 @@ function Navbar({ navigate }) {
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <Brain size={16} className="text-white" />
-          </div>
+          <img
+            src="/hynex-logo.jpeg"
+            alt="Hynex"
+            className="w-9 h-9 rounded-lg object-cover ring-1 ring-white/10"
+          />
           <span className="font-bold text-xl text-white" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Hynexs Edu
+            Hynexs AI
           </span>
         </div>
 
@@ -820,11 +822,13 @@ function Footer({ navigate }) {
         <div className="grid md:grid-cols-4 gap-10 mb-12">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <Brain size={16} className="text-white" />
-              </div>
+              <img
+                src="/hynex-logo.jpeg"
+                alt="Hynex"
+                className="w-9 h-9 rounded-lg object-cover ring-1 ring-white/10"
+              />
               <span className="font-bold text-xl text-white" style={{ fontFamily: "Outfit, sans-serif" }}>
-                Hynexs Edu Counseller
+                Hynexs AI Councellor
               </span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
@@ -877,7 +881,7 @@ function Footer({ navigate }) {
         </div>
 
         <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© 2025 Hynexs Edu Counseller. All rights reserved.</p>
+          <p>© 2025 Hynexs AI Councellor. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <a href="#" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-slate-300 transition-colors">Terms of Service</a>

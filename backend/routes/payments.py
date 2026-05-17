@@ -111,7 +111,7 @@ async def send_premium_email(email: str, name: str):
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0F172A;color:#F8FAFC;padding:40px;border-radius:16px;">
           <h1 style="background:linear-gradient(135deg,#3B82F6,#8B5CF6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:28px;">
-            Welcome to Hynexs Edu Counseller Premium!
+            Welcome to Hynexs AI Councellor Premium!
           </h1>
           <p style="color:#94A3B8;">Hi {name},</p>
           <p style="color:#94A3B8;">Your premium access has been activated. You now have full access to:</p>
@@ -133,7 +133,7 @@ async def send_premium_email(email: str, name: str):
         await asyncio.to_thread(resend.Emails.send, {
             "from": os.environ.get("SENDER_EMAIL", "onboarding@resend.dev"),
             "to": [email],
-            "subject": "Premium Access Activated - Hynexs Edu Counseller",
+            "subject": "Premium Access Activated - Hynexs AI Councellor",
             "html": html,
         })
     except Exception as e:

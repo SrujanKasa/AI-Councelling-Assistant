@@ -92,12 +92,14 @@ export default function Auth() {
 
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <Brain size={20} className="text-white" />
-          </div>
+          <img
+            src="/hynex-logo.jpeg"
+            alt="Hynex"
+            className="w-12 h-12 rounded-xl object-cover ring-1 ring-white/10"
+          />
           <div>
             <p className="font-bold text-white" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Hynexs Edu Counseller
+              Hynexs AI Councellor
             </p>
             <p className="text-slate-400 text-xs">AI-powered college predictions</p>
           </div>

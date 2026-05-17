@@ -99,12 +99,12 @@ export default function Admin() {
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <Brain size={20} className="text-blue-500" />
+            <img src="/hynex-logo.jpeg" alt="Hynex" className="w-8 h-8 rounded-lg object-cover" />
             <div>
               <h1 className="font-bold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Admin Panel
               </h1>
-              <p className="text-slate-400 text-xs">Hynexs Edu Counseller</p>
+              <p className="text-slate-400 text-xs">Hynexs AI Councellor</p>
             </div>
           </div>
         </div>
