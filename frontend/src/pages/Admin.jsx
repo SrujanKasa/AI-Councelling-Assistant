@@ -41,7 +41,9 @@ export default function Admin() {
         headers: getAuthHeaders(),
       });
       setUsers(res.data.users || []);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to fetch users:", e);
+    }
   };
 
   const fetchPayments = async () => {
@@ -50,7 +52,9 @@ export default function Admin() {
         headers: getAuthHeaders(),
       });
       setPayments(res.data.payments || []);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to fetch payments:", e);
+    }
   };
 
   const fetchPredictions = async () => {
@@ -59,7 +63,9 @@ export default function Admin() {
         headers: getAuthHeaders(),
       });
       setPredictions(res.data.predictions || []);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to fetch predictions:", e);
+    }
   };
 
   useEffect(() => {
@@ -67,6 +73,7 @@ export default function Admin() {
     fetchUsers();
     fetchPayments();
     fetchPredictions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const statCards = stats

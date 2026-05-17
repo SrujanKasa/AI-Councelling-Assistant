@@ -31,6 +31,7 @@ async def create_order(request: Request):
         raise HTTPException(status_code=400, detail="Already premium user")
 
     client = get_razorpay_client()
+    order = None
     try:
         order = client.order.create({
             "amount": PREMIUM_AMOUNT,
@@ -40,6 +41,9 @@ async def create_order(request: Request):
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)}")
+
+    if not order:
+        raise HTTPException(status_code=500, detail="Failed to create order")
 
     # Save payment record
     await db.payments.insert_one({

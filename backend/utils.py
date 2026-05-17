@@ -79,6 +79,8 @@ def classify_college(user_rank: int, closing_rank: int) -> tuple:
         return "Unknown", 0.0
 
     ratio = closing_rank / user_rank
+    category = "Dream"
+    probability = 5.0
 
     if ratio >= 1.4:
         category = "Safe"

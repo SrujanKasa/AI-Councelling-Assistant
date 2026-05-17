@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime, timezone
 from utils import get_current_user, classify_college
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import os
@@ -247,9 +248,7 @@ async def predict(req: PredictRequest, request: Request):
             "gender": req.gender,
             "results": results[:30],
             "ai_insight": ai_insight,
-            "created_at": __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            ).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.predictions.insert_one(pred_doc)
 
@@ -357,15 +356,14 @@ async def get_cutoff_trend(
     last_rank = valid[-1]["closing_rank"]
     change_pct = round(((last_rank - first_rank) / first_rank) * 100, 1)
 
+    trend = "stable"
+    trend_label = f"Stable ({change_pct:+.1f}%)"
     if change_pct > 5:
         trend = "easier"
         trend_label = f"Getting Easier ↑ (+{change_pct}%)"
     elif change_pct < -5:
         trend = "harder"
         trend_label = f"Getting Tougher ↓ ({change_pct}%)"
-    else:
-        trend = "stable"
-        trend_label = f"Stable ({change_pct:+.1f}%)"
 
     # Simple linear projection for 2026
     if len(valid) >= 2:
