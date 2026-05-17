@@ -2,18 +2,272 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, BarChart2, MessageSquare, Bookmark,
-  FileText, Bell, LogOut, Brain, Menu, X, TrendingUp,
-  Target, Shield, CreditCard, CheckCircle, User, Zap
+  FileText, Bell, LogOut, Brain, Menu, TrendingUp,
+  Target, Shield, CreditCard, CheckCircle, User, Zap,
+  TrendingDown, Minus, X, ChevronRight, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
+import {
+  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, ReferenceLine, Cell, Legend
+} from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 function getAuthHeaders() {
   const token = localStorage.getItem("access_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/* ─── Mini 3-point sparkline (SVG) ─── */
+function Sparkline({ data, trend }) {
+  const valid = data?.filter(d => d.closing_rank) || [];
+  if (valid.length < 2) {
+    return <span className="text-slate-300 text-xs">—</span>;
+  }
+  const ranks = valid.map(d => d.closing_rank);
+  const minR = Math.min(...ranks);
+  const maxR = Math.max(...ranks);
+  const range = maxR - minR || 1;
+  const w = 56, h = 24, pad = 3;
+  const pts = valid.map((d, i) => {
+    const x = pad + (i / (valid.length - 1)) * (w - 2 * pad);
+    // Higher rank = bottom (easier), lower rank = top (harder)
+    const y = pad + ((maxR - d.closing_rank) / range) * (h - 2 * pad);
+    return `${x},${y}`;
+  });
+  const color = trend === "easier" ? "#22c55e" : trend === "harder" ? "#f97316" : "#94a3b8";
+  return (
+    <svg width={w} height={h} className="overflow-visible">
+      <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {valid.map((d, i) => {
+        const [x, y] = pts[i].split(",").map(Number);
+        return <circle key={i} cx={x} cy={y} r="2.5" fill={color} />;
+      })}
+    </svg>
+  );
+}
+
+/* ─── Trend Badge ─── */
+function TrendBadge({ trend, changePct, small = false }) {
+  const cfg = {
+    easier: { bg: "bg-green-100", text: "text-green-700", icon: ArrowUpRight, label: "Easier" },
+    harder: { bg: "bg-orange-100", text: "text-orange-700", icon: ArrowDownRight, label: "Tougher" },
+    stable: { bg: "bg-slate-100", text: "text-slate-600", icon: Minus, label: "Stable" },
+    insufficient_data: { bg: "bg-slate-100", text: "text-slate-400", icon: Minus, label: "No data" },
+  }[trend] || { bg: "bg-slate-100", text: "text-slate-400", icon: Minus, label: "—" };
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full font-medium ${cfg.bg} ${cfg.text} ${small ? "text-xs px-2 py-0.5" : "text-xs px-2.5 py-1"}`}>
+      <Icon size={10} />
+      {cfg.label}
+      {changePct !== 0 && trend !== "insufficient_data" && (
+        <span className="opacity-75">{changePct > 0 ? `+${changePct}%` : `${changePct}%`}</span>
+      )}
+    </span>
+  );
+}
+
+/* ─── Full Trend Modal ─── */
+function TrendModal({ college, examType, category, gender, quota, onClose }) {
+  const [trendData, setTrendData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const params = new URLSearchParams({
+      exam_type: examType,
+      institute: college.institute,
+      branch: college.branch,
+      category,
+      gender,
+      quota: quota || "AI",
+    });
+    axios.get(`${API}/predictions/trend?${params}`, { headers: getAuthHeaders() })
+      .then(r => setTrendData(r.data))
+      .catch(() => setTrendData({ trend: "insufficient_data", data: [] }))
+      .finally(() => setLoading(false));
+  }, [college, examType, category, gender, quota]);
+
+  const examLabel = { TSEAMCET: "TS EAMCET", JEE_MAIN: "JEE Main", JEE_ADVANCED: "JEE Advanced" }[examType] || examType;
+
+  const chartData = trendData?.data?.map(d => ({
+    year: String(d.year),
+    "Closing Rank": d.closing_rank || null,
+    "Opening Rank": d.opening_rank || null,
+  })) || [];
+
+  const predicted = trendData?.predicted_2026
+    ? [{ year: "2026 (est.)", "Closing Rank": trendData.predicted_2026, predicted: true }]
+    : [];
+  const fullChartData = [...chartData, ...predicted];
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-lg text-xs">
+        <p className="font-bold text-slate-800 mb-1">{label}</p>
+        {payload.map((p, i) => (
+          p.value && <p key={i} style={{ color: p.color }} className="font-semibold">
+            {p.name}: {p.value?.toLocaleString()}
+          </p>
+        ))}
+        {label === "2026 (est.)" && (
+          <p className="text-slate-400 mt-1 italic">AI projection</p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-900 text-lg leading-snug" style={{ fontFamily: "Outfit, sans-serif" }}>
+                {college.institute}
+              </h2>
+              <p className="text-slate-500 text-sm mt-0.5 truncate">{college.branch}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">{examLabel}</span>
+                <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{category}</span>
+                {!loading && trendData && (
+                  <TrendBadge trend={trendData.trend} changePct={trendData.change_pct} />
+                )}
+              </div>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Trend summary cards */}
+              <div className="grid grid-cols-3 gap-3">
+                {[2023, 2024, 2025].map(yr => {
+                  const d = trendData?.data?.find(x => x.year === yr);
+                  const rank = d?.closing_rank;
+                  const prev = trendData?.data?.find(x => x.year === yr - 1)?.closing_rank;
+                  const delta = rank && prev ? rank - prev : null;
+                  return (
+                    <div key={yr} className={`rounded-xl border p-4 text-center ${rank ? "border-slate-200 bg-white" : "border-dashed border-slate-200 bg-slate-50"}`}>
+                      <p className="text-xs font-bold text-slate-400 uppercase mb-1">{yr}</p>
+                      {rank ? (
+                        <>
+                          <p className="text-2xl font-black text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            {rank.toLocaleString()}
+                          </p>
+                          {delta !== null && (
+                            <p className={`text-xs font-semibold mt-1 ${delta > 0 ? "text-green-600" : delta < 0 ? "text-orange-600" : "text-slate-400"}`}>
+                              {delta > 0 ? `+${delta.toLocaleString()}` : delta.toLocaleString()} vs {yr - 1}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-slate-400 text-sm mt-1">No data</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Chart */}
+              {fullChartData.some(d => d["Closing Rank"]) ? (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-semibold text-slate-700 text-sm">Cutoff Rank Trend (2023–2025)</p>
+                    <p className="text-slate-400 text-xs">↑ Higher rank = Easier to get in</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <ResponsiveContainer width="100%" height={220}>
+                      <ComposedChart data={fullChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="year" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: "#94a3b8" }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={v => v?.toLocaleString()}
+                          width={60}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="Closing Rank" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                          {fullChartData.map((entry, i) => (
+                            <Cell
+                              key={i}
+                              fill={entry.predicted ? "#c7d2fe" : trendData?.trend === "easier" ? "#86efac" : trendData?.trend === "harder" ? "#fdba74" : "#93c5fd"}
+                            />
+                          ))}
+                        </Bar>
+                        <Line
+                          type="monotone"
+                          dataKey="Closing Rank"
+                          stroke={trendData?.trend === "easier" ? "#16a34a" : trendData?.trend === "harder" ? "#ea580c" : "#3b82f6"}
+                          strokeWidth={2.5}
+                          dot={{ r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-xl p-8 text-center">
+                  <p className="text-slate-400 text-sm">Not enough data to show trend chart</p>
+                </div>
+              )}
+
+              {/* 2026 prediction */}
+              {trendData?.predicted_2026 && (
+                <div className={`rounded-xl p-4 border ${trendData.trend === "easier" ? "bg-green-50 border-green-200" : trendData.trend === "harder" ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-sm text-slate-800">2026 Projected Cutoff</p>
+                      <p className="text-slate-500 text-xs mt-0.5">Based on linear trend from {trendData.years_with_data}-year data</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
+                        ~{trendData.predicted_2026?.toLocaleString()}
+                      </p>
+                      <TrendBadge trend={trendData.trend} changePct={trendData.change_pct} small />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Interpretation */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">How to Read This</p>
+                <div className="space-y-1.5">
+                  <p className="text-xs text-slate-600 flex items-start gap-2">
+                    <ArrowUpRight size={12} className="text-green-500 flex-shrink-0 mt-0.5" />
+                    <span><strong>Rising rank</strong> = more students qualify → college is getting <strong>easier</strong> to get into</span>
+                  </p>
+                  <p className="text-xs text-slate-600 flex items-start gap-2">
+                    <ArrowDownRight size={12} className="text-orange-500 flex-shrink-0 mt-0.5" />
+                    <span><strong>Falling rank</strong> = fewer students qualify → college is getting <strong>tougher</strong> (more competition)</span>
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const SIDEBAR_ITEMS = [

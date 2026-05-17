@@ -271,3 +271,116 @@ async def get_my_predictions(request: Request):
     ).sort("created_at", -1).limit(20)
     preds = await cursor.to_list(20)
     return preds
+
+
+@router.get("/trend")
+async def get_cutoff_trend(
+    exam_type: str,
+    institute: str,
+    branch: str,
+    category: str,
+    gender: str,
+    quota: str = "AI",
+    request: Request = None,
+):
+    """Return year-by-year (2023/2024/2025) cutoff trend for a college+branch."""
+    db = await _get_db(request)
+    years = [2023, 2024, 2025]
+    data = []
+
+    if exam_type == "TSEAMCET":
+        ts_cat = TS_CATEGORY_MAP.get(category, category)
+        gender_filter = "BOYS" if gender.lower() in ("male", "boys") else "GIRLS"
+
+        for year in years:
+            row = await db.ts_eamcet_cutoffs.find_one(
+                {
+                    "college_name": institute,
+                    "branch_name": branch,
+                    "category": ts_cat,
+                    "gender": gender_filter,
+                    "year": year,
+                },
+                {"_id": 0, "last_rank": 1},
+            )
+            data.append({
+                "year": year,
+                "closing_rank": row["last_rank"] if row and row.get("last_rank") else None,
+            })
+
+    elif exam_type in ("JEE_MAIN", "JEE_ADVANCED"):
+        seat_type = JOSAA_SEAT_MAP.get(category, "OPEN")
+        gender_filter = "Gender-Neutral"
+        if gender.lower() in ("female", "girls"):
+            gender_filter = "Female-only (including Supernumerary)"
+
+        for year in years:
+            # Try exact match first, then any round (take round 6 or last available)
+            cursor = db.josaa_cutoffs.find(
+                {
+                    "institute_name": institute,
+                    "program_name": branch,
+                    "seat_type": seat_type,
+                    "quota": quota,
+                    "gender": gender_filter,
+                    "year": year,
+                    "closing_rank": {"$gt": 0},
+                },
+                {"_id": 0, "closing_rank": 1, "opening_rank": 1, "round": 1},
+            ).sort("round", -1).limit(1)
+            rows = await cursor.to_list(1)
+            if rows:
+                data.append({
+                    "year": year,
+                    "closing_rank": rows[0]["closing_rank"],
+                    "opening_rank": rows[0].get("opening_rank", 0),
+                })
+            else:
+                data.append({"year": year, "closing_rank": None, "opening_rank": None})
+
+    # Filter out missing years
+    valid = [d for d in data if d["closing_rank"]]
+
+    if len(valid) < 2:
+        return {
+            "institute": institute,
+            "branch": branch,
+            "data": data,
+            "trend": "insufficient_data",
+            "change_pct": 0,
+            "trend_label": "Not enough data",
+            "predicted_2026": None,
+        }
+
+    # Trend analysis: higher rank = easier, lower rank = harder
+    first_rank = valid[0]["closing_rank"]
+    last_rank = valid[-1]["closing_rank"]
+    change_pct = round(((last_rank - first_rank) / first_rank) * 100, 1)
+
+    if change_pct > 5:
+        trend = "easier"
+        trend_label = f"Getting Easier ↑ (+{change_pct}%)"
+    elif change_pct < -5:
+        trend = "harder"
+        trend_label = f"Getting Tougher ↓ ({change_pct}%)"
+    else:
+        trend = "stable"
+        trend_label = f"Stable ({change_pct:+.1f}%)"
+
+    # Simple linear projection for 2026
+    if len(valid) >= 2:
+        delta = valid[-1]["closing_rank"] - valid[-2]["closing_rank"]
+        predicted_2026 = valid[-1]["closing_rank"] + delta
+    else:
+        predicted_2026 = valid[-1]["closing_rank"]
+
+    return {
+        "institute": institute,
+        "branch": branch,
+        "data": data,
+        "trend": trend,
+        "change_pct": change_pct,
+        "trend_label": trend_label,
+        "predicted_2026": max(1, predicted_2026),
+        "years_with_data": len(valid),
+    }
