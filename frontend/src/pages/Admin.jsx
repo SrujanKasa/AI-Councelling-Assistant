@@ -28,7 +28,6 @@ export default function Admin() {
     try {
       const res = await axios.get(`${API}/admin/stats`, {
         headers: getAuthHeaders(),
-        withCredentials: true,
       });
       setStats(res.data);
     } catch (e) {
@@ -40,7 +39,6 @@ export default function Admin() {
     try {
       const res = await axios.get(`${API}/admin/users`, {
         headers: getAuthHeaders(),
-        withCredentials: true,
       });
       setUsers(res.data.users || []);
     } catch (e) {}
@@ -50,7 +48,6 @@ export default function Admin() {
     try {
       const res = await axios.get(`${API}/admin/payments`, {
         headers: getAuthHeaders(),
-        withCredentials: true,
       });
       setPayments(res.data.payments || []);
     } catch (e) {}
@@ -60,7 +57,6 @@ export default function Admin() {
     try {
       const res = await axios.get(`${API}/admin/predictions`, {
         headers: getAuthHeaders(),
-        withCredentials: true,
       });
       setPredictions(res.data.predictions || []);
     } catch (e) {}

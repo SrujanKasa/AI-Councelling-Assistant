@@ -14,7 +14,6 @@ export function AuthProvider({ children }) {
       axios
         .get(`${API}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
         })
         .then((res) => setUser(res.data))
         .catch(() => {
@@ -23,20 +22,13 @@ export function AuthProvider({ children }) {
         })
         .finally(() => setLoading(false));
     } else {
-      axios
-        .get(`${API}/auth/me`, { withCredentials: true })
-        .then((res) => setUser(res.data))
-        .catch(() => setUser(false))
-        .finally(() => setLoading(false));
+      setUser(false);
+      setLoading(false);
     }
   }, []);
 
   const login = async (email, password) => {
-    const res = await axios.post(
-      `${API}/auth/login`,
-      { email, password },
-      { withCredentials: true }
-    );
+    const res = await axios.post(`${API}/auth/login`, { email, password });
     if (res.data.access_token) {
       localStorage.setItem("access_token", res.data.access_token);
     }
@@ -45,11 +37,7 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (name, email, password) => {
-    const res = await axios.post(
-      `${API}/auth/register`,
-      { name, email, password },
-      { withCredentials: true }
-    );
+    const res = await axios.post(`${API}/auth/register`, { name, email, password });
     if (res.data.access_token) {
       localStorage.setItem("access_token", res.data.access_token);
     }
@@ -58,7 +46,6 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await axios.post(`${API}/auth/logout`, {}, { withCredentials: true }).catch(() => {});
     localStorage.removeItem("access_token");
     setUser(false);
   };
@@ -66,7 +53,7 @@ export function AuthProvider({ children }) {
   const refreshUser = async () => {
     const token = localStorage.getItem("access_token");
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await axios.get(`${API}/auth/me`, { headers, withCredentials: true });
+    const res = await axios.get(`${API}/auth/me`, { headers });
     setUser(res.data);
     return res.data;
   };

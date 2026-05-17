@@ -18,13 +18,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
-    response.set_cookie("access_token", access_token, httponly=True, secure=False,
-                        samesite="lax", max_age=86400, path="/")
-    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False,
-                        samesite="lax", max_age=604800, path="/")
-
-
 def user_dict(user: dict) -> dict:
     user = dict(user)
     user["_id"] = str(user.get("_id", ""))
@@ -37,7 +30,7 @@ async def _get_db(request: Request):
 
 
 @router.post("/register")
-async def register(req: RegisterRequest, response: Response, request: Request):
+async def register(req: RegisterRequest, request: Request):
     db = await _get_db(request)
     email = req.email.lower()
     existing = await db.users.find_one({"email": email})
@@ -57,16 +50,13 @@ async def register(req: RegisterRequest, response: Response, request: Request):
     await db.users.insert_one(user_doc)
 
     access_token = create_access_token(uid, email)
-    refresh_token = create_refresh_token(uid)
-    set_auth_cookies(response, access_token, refresh_token)
-
     user_doc["_id"] = str(user_doc.get("_id", ""))
     user_doc.pop("password_hash", None)
     return {"user": user_doc, "access_token": access_token}
 
 
 @router.post("/login")
-async def login(req: LoginRequest, response: Response, request: Request):
+async def login(req: LoginRequest, request: Request):
     db = await _get_db(request)
     email = req.email.lower()
     user = await db.users.find_one({"email": email})
@@ -75,16 +65,11 @@ async def login(req: LoginRequest, response: Response, request: Request):
 
     uid = user.get("uid", str(user["_id"]))
     access_token = create_access_token(uid, email)
-    refresh_token = create_refresh_token(uid)
-    set_auth_cookies(response, access_token, refresh_token)
-
     return {"user": user_dict(user), "access_token": access_token}
 
 
 @router.post("/logout")
-async def logout(response: Response):
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+async def logout():
     return {"message": "Logged out"}
 
 

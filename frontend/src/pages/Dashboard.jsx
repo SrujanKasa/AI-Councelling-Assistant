@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import axios from "axios";
+import ReactMarkdown from "react-markdown";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -123,23 +124,65 @@ function PredictionForm({ user, onResults }) {
     quota: "AI",
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const tsCategories = ["OC", "BC_A", "BC_B", "BC_C", "BC_D", "BC_E", "SC", "ST", "EWS"];
-  const josaaCategories = ["OPEN", "OBC-NCL", "EWS", "SC", "ST"];
-  const categories = form.exam_type === "TSEAMCET" ? tsCategories : josaaCategories;
+  const examConfig = {
+    TSEAMCET: {
+      label: "TS EAPCET",
+      rankLabel: "TS EAMCET Rank (CRL)",
+      rankPlaceholder: "e.g. 5000",
+      rankHelp: "Your common rank in TS EAMCET",
+      categories: ["OC", "BC_A", "BC_B", "BC_C", "BC_D", "BC_E", "SC", "ST", "EWS"],
+      quota: null,
+      example: "e.g. 5,000",
+    },
+    JEE_MAIN: {
+      label: "JEE Main (NITs/IIITs)",
+      rankLabel: "JEE Main CRL Rank",
+      rankPlaceholder: "e.g. 50000",
+      rankHelp: "Common Rank List (CRL) from JEE Main",
+      categories: ["OPEN", "OBC-NCL", "EWS", "SC", "ST"],
+      quota: true,
+      example: "e.g. 50,000",
+    },
+    JEE_ADVANCED: {
+      label: "JEE Advanced (IITs)",
+      rankLabel: "JEE Advanced CRL Rank",
+      rankPlaceholder: "e.g. 5000",
+      rankHelp: "Common Rank List (CRL) from JEE Advanced",
+      categories: ["OPEN", "OBC-NCL", "EWS", "SC", "ST"],
+      quota: true,
+      example: "e.g. 5,000",
+    },
+  };
+
+  const cfg = examConfig[form.exam_type];
+
+  const handleExamChange = (exam) => {
+    const newCfg = examConfig[exam];
+    setForm({
+      ...form,
+      exam_type: exam,
+      rank: "",
+      category: newCfg.categories[0],
+      quota: "AI",
+    });
+    setError("");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
     try {
       const res = await axios.post(
         `${API}/predictions/predict`,
         { ...form, rank: parseInt(form.rank) },
-        { headers: getAuthHeaders(), withCredentials: true }
+        { headers: getAuthHeaders() }
       );
       onResults(res.data, form);
     } catch (err) {
-      console.error(err);
+      setError(err.response?.data?.detail || "Failed to get predictions. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -147,29 +190,47 @@ function PredictionForm({ user, onResults }) {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-5">
         <Target size={18} className="text-blue-500" />
         <h3 className="font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
           Get College Predictions
         </h3>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
-        <div>
-          <label className="text-slate-500 text-xs mb-1 block">Exam Type</label>
-          <select
-            data-testid="pred-exam-select"
-            value={form.exam_type}
-            onChange={(e) => setForm({ ...form, exam_type: e.target.value, category: "" })}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+      {/* Exam type selector */}
+      <div className="flex flex-wrap gap-2 mb-5 p-1 bg-slate-50 rounded-xl border border-slate-200">
+        {Object.entries(examConfig).map(([key, val]) => (
+          <button
+            key={key}
+            data-testid={`exam-tab-${key}`}
+            onClick={() => handleExamChange(key)}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+              form.exam_type === key
+                ? "bg-white shadow-sm text-blue-600 border border-blue-200"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
           >
-            <option value="TSEAMCET">TS EAPCET</option>
-            <option value="JOSAA">JoSAA</option>
-          </select>
-        </div>
+            {val.label}
+          </button>
+        ))}
+      </div>
 
+      {/* Rank info banner */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-2">
+        <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <span className="text-white text-xs font-bold">i</span>
+        </div>
+        <p className="text-blue-700 text-xs leading-relaxed">
+          <strong>{cfg.rankLabel}:</strong> {cfg.rankHelp}.
+          {form.exam_type === "JEE_ADVANCED" && " IITs only accept JEE Advanced CRL rank — not JEE Main rank."}
+          {form.exam_type === "JEE_MAIN" && " NITs, IIITs and GFTIs use JEE Main CRL rank (not state rank)."}
+          {form.exam_type === "TSEAMCET" && " Telangana Engineering college cutoffs use TS EAMCET rank."}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
         <div>
-          <label className="text-slate-500 text-xs mb-1 block">Your Rank</label>
+          <label className="text-slate-500 text-xs mb-1 block font-medium">{cfg.rankLabel} *</label>
           <input
             data-testid="pred-rank-input"
             type="number"
@@ -177,25 +238,25 @@ function PredictionForm({ user, onResults }) {
             min={1}
             value={form.rank}
             onChange={(e) => setForm({ ...form, rank: e.target.value })}
-            placeholder="e.g. 5000"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+            placeholder={cfg.rankPlaceholder}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
           />
         </div>
 
         <div>
-          <label className="text-slate-500 text-xs mb-1 block">Category</label>
+          <label className="text-slate-500 text-xs mb-1 block font-medium">Category *</label>
           <select
             data-testid="pred-category-select"
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
           >
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            {cfg.categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
         <div>
-          <label className="text-slate-500 text-xs mb-1 block">Gender</label>
+          <label className="text-slate-500 text-xs mb-1 block font-medium">Gender *</label>
           <select
             data-testid="pred-gender-select"
             value={form.gender}
@@ -207,87 +268,143 @@ function PredictionForm({ user, onResults }) {
           </select>
         </div>
 
-        <button
-          data-testid="pred-submit-btn"
-          type="submit"
-          disabled={loading}
-          className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50 h-9 text-sm"
-        >
-          {loading ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Zap size={14} />
-          )}
-          {loading ? "Analyzing..." : "Predict"}
-        </button>
+        {cfg.quota && (
+          <div>
+            <label className="text-slate-500 text-xs mb-1 block font-medium">Quota</label>
+            <select
+              data-testid="pred-quota-select"
+              value={form.quota}
+              onChange={(e) => setForm({ ...form, quota: e.target.value })}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-blue-500"
+            >
+              <option value="AI">All India (AI)</option>
+              <option value="HS">Home State (HS)</option>
+              <option value="OS">Outside State (OS)</option>
+            </select>
+          </div>
+        )}
+
+        <div className={cfg.quota ? "" : "md:col-start-4"}>
+          <button
+            data-testid="pred-submit-btn"
+            type="submit"
+            disabled={loading || !form.rank}
+            className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 h-9 text-sm"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Zap size={14} />
+            )}
+            {loading ? "Analyzing..." : "Predict"}
+          </button>
+        </div>
       </form>
+
+      {error && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs">
+          {error}
+        </div>
+      )}
     </div>
   );
 }
 
-function PredictionResults({ results, user, onPayment }) {
+function PredictionResults({ results, user, onPayment, examType }) {
   if (!results) return null;
 
   const typeConfig = {
-    Safe: { color: "text-green-600", bg: "bg-green-50", border: "border-green-200", badge: "bg-green-100 text-green-700" },
-    Target: { color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", badge: "bg-yellow-100 text-yellow-700" },
-    Dream: { color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-100 text-orange-700" },
+    Safe: { color: "text-green-600", bg: "bg-green-50", border: "border-green-200", badge: "bg-green-100 text-green-700", barColor: "bg-green-500" },
+    Target: { color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", badge: "bg-yellow-100 text-yellow-700", barColor: "bg-yellow-500" },
+    Dream: { color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-100 text-orange-700", barColor: "bg-orange-500" },
   };
 
   const allResults = [...(results.safe || []), ...(results.target || []), ...(results.dream || [])];
   const limited = !user?.is_premium;
-  const displayed = limited ? allResults.slice(0, 5) : allResults;
+  const displayed = limited ? allResults.slice(0, 8) : allResults;
+
+  const examLabel = {
+    TSEAMCET: "TS EAMCET",
+    JEE_MAIN: "JEE Main (NITs/IIITs)",
+    JEE_ADVANCED: "JEE Advanced (IITs)",
+  }[examType] || examType;
 
   return (
     <div className="space-y-4">
       {/* AI Insight */}
       {results.ai_insight && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Brain size={16} className="text-blue-500" />
-            <p className="text-blue-700 font-semibold text-sm">AI Counseling Insight</p>
+            <p className="text-blue-700 font-semibold text-sm">AI Counseling Insight — {examLabel}</p>
           </div>
-          <p className="text-blue-700 text-sm leading-relaxed" data-testid="ai-insight-text">
-            {results.ai_insight}
-          </p>
+          <div className="text-blue-800 text-sm leading-relaxed" data-testid="ai-insight-text">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                strong: ({ children }) => <strong className="font-bold text-blue-900">{children}</strong>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                li: ({ children }) => <li>{children}</li>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+              }}
+            >
+              {results.ai_insight}
+            </ReactMarkdown>
+          </div>
         </div>
       )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        {["safe", "target", "dream"].map((t) => (
-          <div key={t} className={`rounded-xl border p-4 ${typeConfig[t.charAt(0).toUpperCase() + t.slice(1)]?.bg} ${typeConfig[t.charAt(0).toUpperCase() + t.slice(1)]?.border}`}>
-            <p className={`text-xs font-bold uppercase ${typeConfig[t.charAt(0).toUpperCase() + t.slice(1)]?.color}`}>
-              {t}
-            </p>
-            <p className={`text-2xl font-bold mt-1 ${typeConfig[t.charAt(0).toUpperCase() + t.slice(1)]?.color}`} style={{ fontFamily: "Outfit, sans-serif" }}>
-              {results[t]?.length || 0}
-            </p>
-            <p className="text-slate-500 text-xs">colleges</p>
-          </div>
-        ))}
+        {[
+          { key: "safe", label: "Safe", icon: "✓" },
+          { key: "target", label: "Target", icon: "◎" },
+          { key: "dream", label: "Dream", icon: "★" },
+        ].map(({ key, label, icon }) => {
+          const cfg = typeConfig[label];
+          return (
+            <div key={key} className={`rounded-xl border p-4 ${cfg.bg} ${cfg.border}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-lg ${cfg.color}`}>{icon}</span>
+                <p className={`text-xs font-bold uppercase ${cfg.color}`}>{label}</p>
+              </div>
+              <p className={`text-3xl font-bold ${cfg.color}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                {results[key]?.length || 0}
+              </p>
+              <p className="text-slate-500 text-xs">colleges</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h4 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
-            College Predictions ({results.total} found)
-          </h4>
-          {limited && (
-            <span className="text-xs text-slate-400">Showing 5 of {results.total}</span>
-          )}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
+              College Predictions
+            </h4>
+            <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">
+              {examLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-slate-400 text-xs">{results.total} colleges found</span>
+            {limited && <span className="text-amber-500 text-xs font-medium">Showing 8 of {results.total}</span>}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="predictions-table">
             <thead className="bg-slate-50">
               <tr>
+                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">#</th>
                 <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">College</th>
                 <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Branch</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Type</th>
+                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Chance</th>
                 <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Probability</th>
                 <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Cutoff Rank</th>
+                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Year</th>
               </tr>
             </thead>
             <tbody>
@@ -295,29 +412,39 @@ function PredictionResults({ results, user, onPayment }) {
                 const cfg = typeConfig[row.category] || typeConfig.Dream;
                 return (
                   <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium max-w-xs">
                       <p className="truncate">{row.institute}</p>
+                      {row.type && (
+                        <span className="text-xs text-slate-400">{row.type}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-600 max-w-xs">
                       <p className="truncate text-xs">{row.branch}</p>
+                      {row.fees && row.fees !== "N/A" && (
+                        <p className="text-slate-400 text-xs">{row.fees}</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${cfg.badge}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full font-semibold ${cfg.badge}`}>
                         {row.category}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-[80px]">
                         <div className="w-16 bg-slate-200 rounded-full h-1.5">
                           <div
-                            className={`h-1.5 rounded-full ${row.category === "Safe" ? "bg-green-500" : row.category === "Target" ? "bg-yellow-500" : "bg-orange-500"}`}
+                            className={`h-1.5 rounded-full ${cfg.barColor}`}
                             style={{ width: `${row.probability}%` }}
                           />
                         </div>
                         <span className={`font-bold text-xs ${cfg.color}`}>{row.probability}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{row.closing_rank}</td>
+                    <td className="px-4 py-3 text-slate-600 font-mono text-xs">
+                      {row.closing_rank?.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{row.year}</td>
                   </tr>
                 );
               })}
@@ -326,21 +453,21 @@ function PredictionResults({ results, user, onPayment }) {
         </div>
 
         {/* Paywall */}
-        {limited && results.total > 5 && (
-          <div className="border-t border-slate-200 p-6 text-center bg-gradient-to-b from-white to-slate-50">
-            <div className="mb-3">
-              <Shield size={24} className="text-blue-500 mx-auto mb-2" />
-              <p className="font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
-                {results.total - 5} more colleges hidden
-              </p>
-              <p className="text-slate-500 text-sm">Upgrade for ₹50 to unlock all predictions, AI counseling, and reports</p>
-            </div>
+        {limited && results.total > 8 && (
+          <div className="border-t border-dashed border-slate-300 p-6 text-center bg-gradient-to-b from-white to-slate-50">
+            <Shield size={24} className="text-blue-500 mx-auto mb-2" />
+            <p className="font-semibold text-slate-800 mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {results.total - 8} more colleges hidden
+            </p>
+            <p className="text-slate-500 text-sm mb-4">
+              Upgrade for ₹50 to unlock all {results.total} predictions + full AI counseling
+            </p>
             <button
               data-testid="unlock-premium-btn"
               onClick={onPayment}
               className="btn-primary"
             >
-              Unlock Premium — ₹50
+              Unlock All Colleges — ₹50
             </button>
           </div>
         )}
@@ -372,7 +499,7 @@ function PaymentModal({ onClose, onSuccess, user }) {
       const res = await axios.post(
         `${API}/payment/create-order`,
         {},
-        { headers: getAuthHeaders(), withCredentials: true }
+        { headers: getAuthHeaders() }
       );
       const { order_id, amount, currency, key_id } = res.data;
 
@@ -392,7 +519,7 @@ function PaymentModal({ onClose, onSuccess, user }) {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               },
-              { headers: getAuthHeaders(), withCredentials: true }
+              { headers: getAuthHeaders() }
             );
             onSuccess();
           } catch (e) {
@@ -550,6 +677,7 @@ export default function Dashboard() {
         <PredictionResults
           results={predictions}
           user={user}
+          examType={predForm?.exam_type}
           onPayment={() => setShowPayment(true)}
         />
       )}

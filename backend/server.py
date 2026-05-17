@@ -26,12 +26,11 @@ db = client[db_name]
 
 app.state.db = db
 
-# CORS
-frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+# CORS - Allow all origins since we use Bearer tokens not cookies
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url, "http://localhost:3000", "http://localhost:3001", "*"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

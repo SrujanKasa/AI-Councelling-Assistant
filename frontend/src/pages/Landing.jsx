@@ -146,11 +146,11 @@ function HeroSection({ navigate }) {
             </button>
             <button
               data-testid="hero-predict-josaa-btn"
-              onClick={() => handlePredict("JOSAA")}
+              onClick={() => handlePredict("JEE_MAIN")}
               className="btn-secondary whitespace-nowrap flex items-center gap-2"
             >
               <BarChart2 size={16} />
-              JoSAA
+              JoSAA (JEE)
             </button>
           </div>
 
@@ -409,6 +409,36 @@ function LiveDemo({ navigate }) {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const examConfig = {
+    TSEAMCET: {
+      label: "TS EAPCET",
+      rankLabel: "TS EAMCET Rank",
+      placeholder: "e.g. 10000",
+      categories: ["OC", "BC_A", "BC_B", "BC_C", "BC_D", "SC", "ST", "EWS"],
+    },
+    JEE_MAIN: {
+      label: "JEE Main (NITs/IIITs)",
+      rankLabel: "JEE Main CRL Rank",
+      placeholder: "e.g. 50000",
+      categories: ["OPEN", "OBC-NCL", "EWS", "SC", "ST"],
+    },
+    JEE_ADVANCED: {
+      label: "JEE Advanced (IITs)",
+      rankLabel: "JEE Advanced CRL Rank",
+      placeholder: "e.g. 5000",
+      categories: ["OPEN", "OBC-NCL", "EWS", "SC", "ST"],
+    },
+  };
+
+  const cfg = examConfig[exam];
+
+  const handleExamChange = (e) => {
+    setExam(e);
+    setCategory(examConfig[e].categories[0]);
+    setRank("");
+    setResults(null);
+  };
+
   const runDemo = async () => {
     if (!rank) return;
     setLoading(true);
@@ -421,6 +451,7 @@ function LiveDemo({ navigate }) {
           rank: parseInt(rank),
           category,
           gender: "Male",
+          quota: "AI",
         }),
       });
       const data = await res.json();
@@ -440,18 +471,37 @@ function LiveDemo({ navigate }) {
           <h2 className="text-3xl md:text-4xl font-medium text-white tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
             Try It Right Now — Free
           </h2>
-          <p className="text-slate-400 mt-3">Enter a sample rank and see AI predictions instantly</p>
+          <p className="text-slate-400 mt-3">Enter your rank and see real AI predictions instantly</p>
         </div>
 
         <div className="glass-card rounded-2xl p-8">
+          {/* Exam Tabs */}
+          <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-xl">
+            {Object.entries(examConfig).map(([key, val]) => (
+              <button
+                key={key}
+                data-testid={`demo-exam-tab-${key}`}
+                onClick={() => handleExamChange(key)}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+                  exam === key
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {val.label}
+              </button>
+            ))}
+          </div>
+
           <div className="grid sm:grid-cols-3 gap-4 mb-6">
             <div>
-              <label className="text-slate-400 text-xs mb-1 block">Your Rank</label>
+              <label className="text-slate-400 text-xs mb-1 block">{cfg.rankLabel} *</label>
               <input
                 data-testid="demo-rank-input"
                 type="number"
                 value={rank}
                 onChange={(e) => setRank(e.target.value)}
+                placeholder={cfg.placeholder}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors text-sm"
               />
             </div>
@@ -463,71 +513,48 @@ function LiveDemo({ navigate }) {
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors text-sm"
               >
-                <option value="OC">OC (General)</option>
-                <option value="BC_A">BC-A</option>
-                <option value="BC_B">BC-B</option>
-                <option value="BC_C">BC-C</option>
-                <option value="SC">SC</option>
-                <option value="ST">ST</option>
-                <option value="OPEN">OPEN (JoSAA)</option>
-                <option value="OBC-NCL">OBC-NCL (JoSAA)</option>
-                <option value="EWS">EWS</option>
+                {cfg.categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-slate-400 text-xs mb-1 block">Exam Type</label>
-              <select
-                data-testid="demo-exam-select"
-                value={exam}
-                onChange={(e) => setExam(e.target.value)}
-                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors text-sm"
+            <div className="flex items-end">
+              <button
+                data-testid="demo-predict-btn"
+                onClick={runDemo}
+                disabled={loading || !rank}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <option value="TSEAMCET">TS EAPCET</option>
-                <option value="JOSAA">JoSAA</option>
-              </select>
+                {loading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Zap size={16} />
+                )}
+                {loading ? "Analyzing..." : "Predict My Colleges"}
+              </button>
             </div>
           </div>
 
-          <button
-            data-testid="demo-predict-btn"
-            onClick={runDemo}
-            disabled={loading}
-            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Zap size={16} />
-            )}
-            {loading ? "Analyzing..." : "Predict My Colleges"}
-          </button>
-
           {results && !results.error && (
-            <div className="mt-6 space-y-3 animate-fade-in">
+            <div className="space-y-3 animate-fade-in">
               {results.ai_insight && (
                 <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                   <p className="text-blue-300 text-sm leading-relaxed">
                     <Brain size={14} className="inline mr-2" />
-                    {results.ai_insight}
+                    {results.ai_insight?.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').substring(0, 250)}...
                   </p>
                 </div>
               )}
               <div className="grid sm:grid-cols-3 gap-3">
                 {["safe", "target", "dream"].map((type) => (
-                  <div key={type} className="bg-white/5 rounded-xl p-4">
-                    <p className={`text-xs font-bold uppercase mb-2 ${
-                      type === "safe" ? "text-green-400" : type === "target" ? "text-yellow-400" : "text-orange-400"
-                    }`}>
+                  <div key={type} className={`rounded-xl p-4 ${type === "safe" ? "bg-green-500/10 border border-green-500/20" : type === "target" ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-orange-500/10 border border-orange-500/20"}`}>
+                    <p className={`text-xs font-bold uppercase mb-2 ${type === "safe" ? "text-green-400" : type === "target" ? "text-yellow-400" : "text-orange-400"}`}>
                       {type} ({results[type]?.length || 0})
                     </p>
                     {results[type]?.slice(0, 2).map((c, i) => (
-                      <div key={i} className="mb-1">
+                      <div key={i} className="mb-2">
                         <p className="text-white text-xs font-medium truncate">{c.institute}</p>
-                        <p className="text-slate-400 text-xs truncate">{c.branch?.substring(0, 30)}</p>
-                        <p className={`text-xs font-bold ${
-                          type === "safe" ? "text-green-400" : type === "target" ? "text-yellow-400" : "text-orange-400"
-                        }`}>
-                          {c.probability}%
+                        <p className="text-slate-400 text-xs truncate">{c.branch?.substring(0, 35)}</p>
+                        <p className={`text-xs font-bold ${type === "safe" ? "text-green-400" : type === "target" ? "text-yellow-400" : "text-orange-400"}`}>
+                          {c.probability}% chance • Cutoff: {c.closing_rank?.toLocaleString()}
                         </p>
                       </div>
                     ))}
@@ -535,7 +562,10 @@ function LiveDemo({ navigate }) {
                 ))}
               </div>
               <p className="text-center text-slate-400 text-xs">
-                Sign up for full predictions with {results.total}+ colleges
+                {results.total} colleges analyzed. Sign up to unlock all predictions →{" "}
+                <button onClick={() => navigate("/auth?tab=register")} className="text-blue-400 hover:underline">
+                  Free Account
+                </button>
               </p>
             </div>
           )}

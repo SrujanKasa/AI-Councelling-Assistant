@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import axios from "axios";
+import ReactMarkdown from "react-markdown";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,11 +44,26 @@ function Message({ msg }) {
             : "bg-white/10 border border-white/10 text-slate-200 rounded-tl-none"
         }`}
       >
-        {msg.content.split("\n").map((line, i) => (
-          <p key={i} className={line === "" ? "h-2" : ""}>
-            {line}
-          </p>
-        ))}
+        {isUser ? (
+          msg.content.split("\n").map((line, i) => (
+            <p key={i} className={line === "" ? "h-2" : ""}>{line}</p>
+          ))
+        ) : (
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+              ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+              li: ({ children }) => <li className="text-slate-200">{children}</li>,
+              h3: ({ children }) => <h3 className="font-bold text-white mb-1 mt-2">{children}</h3>,
+              h4: ({ children }) => <h4 className="font-semibold text-white mb-1">{children}</h4>,
+              code: ({ children }) => <code className="bg-white/10 px-1 rounded text-xs font-mono">{children}</code>,
+            }}
+          >
+            {msg.content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   );
@@ -88,7 +104,7 @@ export default function Counselor() {
           rank: rank ? parseInt(rank) : undefined,
           category: category || undefined,
         },
-        { headers: getAuthHeaders(), withCredentials: true }
+        { headers: getAuthHeaders() }
       );
 
       if (!sessionId) setSessionId(res.data.session_id);
