@@ -678,7 +678,7 @@ function PredictionResults({ results, user, onPayment, examType, predForm }) {
     },
   };
 
-  const limited = !user?.is_premium;
+  const limited = !user?.is_premium && user?.role !== "admin";
   const totalShown = limited ? 8 : results.total;
 
   const examLabel = {

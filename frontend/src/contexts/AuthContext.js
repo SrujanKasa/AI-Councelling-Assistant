@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import { Navigate } from "react-router-dom";
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -100,7 +101,7 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-export function ProtectedRoute({ children, adminOnly = false }) {
+export function ProtectedRoute({ children, adminOnly = false, premiumRequired = false }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -112,13 +113,16 @@ export function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   if (!user) {
-    window.location.href = "/auth";
-    return null;
+    return <Navigate to="/auth" replace />;
   }
 
   if (adminOnly && user.role !== "admin") {
-    window.location.href = "/dashboard";
-    return null;
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Premium gate — admins always bypass
+  if (premiumRequired && !user.is_premium && user.role !== "admin") {
+    return <Navigate to="/upgrade" replace />;
   }
 
   return children;

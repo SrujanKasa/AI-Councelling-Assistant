@@ -6,6 +6,7 @@ import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Counselor from "@/pages/Counselor";
 import Admin from "@/pages/Admin";
+import Upgrade from "@/pages/Upgrade";
 import "@/App.css";
 
 function App() {
@@ -16,9 +17,17 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
           <Route
-            path="/dashboard"
+            path="/upgrade"
             element={
               <ProtectedRoute>
+                <Upgrade />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute premiumRequired>
                 <Dashboard />
               </ProtectedRoute>
             }
@@ -26,7 +35,7 @@ function App() {
           <Route
             path="/counselor"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute premiumRequired>
                 <Counselor />
               </ProtectedRoute>
             }

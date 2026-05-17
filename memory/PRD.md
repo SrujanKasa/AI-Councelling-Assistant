@@ -1,75 +1,77 @@
 # PRD - Hynexs Edu Counseller
-**Last Updated:** May 2025
+**Last Updated:** Feb 2026
 
 ## Problem Statement
-Build a production-ready AI-powered college counseling and rank prediction platform for:
+AI-powered college counseling and rank prediction platform for:
 - TS EAMCET (Telangana Engineering)
-- JoSAA (JEE Main + JEE Advanced)
+- JoSAA (JEE Main → NITs/IIITs/GFTIs + JEE Advanced → IITs)
+
+**Monetization:** Strict paywall — ₹50 one-time payment. No free tier. Without payment NO access is granted beyond `/auth` and `/upgrade` screens.
 
 ## Architecture
-- **Frontend:** React + Tailwind CSS + React Router
+- **Frontend:** React + Tailwind + Shadcn + Recharts + React Router
 - **Backend:** FastAPI + MongoDB (Motor async)
-- **AI:** Gemini 3 Flash (Emergent LLM Key) for AI counseling + predictions
-- **Payments:** Razorpay (₹50 one-time)
-- **Email:** Resend (transactional)
-- **Auth:** JWT Bearer tokens via localStorage
+- **AI:** Gemini Flash (Emergent LLM Key) for AI Insights + Counselor chat
+- **Payments:** Razorpay (test keys configured in `/app/backend/.env`)
+- **Email:** Resend (post-payment confirmation + WhatsApp join link)
+- **Auth:** JWT Bearer (email/password) + Emergent-managed Google OAuth
 
 ## Data
-- JoSAA cutoffs: 189,407 records (2023-2025) — IITs, NITs, IIITs, GFTIs
-- TS EAMCET cutoffs: 52,835 records (2023-2025) — 341 Telangana colleges
+- JoSAA cutoffs: 189,407 records (2023–2025)
+- TS EAMCET cutoffs: 52,835 records (2023–2025)
 
-## What's Implemented (MVP)
+## What's Implemented
 
 ### Backend
-- [x] Auth: Email/Password JWT (register, login, me, logout) — Bearer token only
-- [x] Predictions: TS EAMCET, JEE Main (NITs/IIITs), JEE Advanced (IITs)
-- [x] Prediction engine: Safe/Target/Dream classification + probability scoring
-- [x] AI Insight: Gemini Flash generates personalized counseling advice per prediction
-- [x] AI Counselor: Chat endpoint with conversation history (Gemini Flash) + markdown
-- [x] Razorpay: Create order + verify payment (₹50 one-time)
-- [x] Resend email: Auto-send after payment
-- [x] Admin: Stats, users, payments, predictions
-- [x] Data seeding: CSV auto-loaded on startup
+- [x] JWT Auth (register, login, /me, logout)
+- [x] Google OAuth via `/api/auth/google-session` (Emergent-managed)
+- [x] Predictions: TS EAMCET, JEE Main, JEE Advanced (Safe/Target/Dream classification)
+- [x] AI Insights (Gemini Flash, markdown)
+- [x] AI Counselor chat (Gemini Flash, conversation history)
+- [x] Razorpay create-order + verify (₹50 = 5000 paise)
+- [x] Resend confirmation email with WhatsApp join link
+- [x] Cutoff Trend endpoint `/api/predictions/trend` — 2023–2025 data + 2026 linear projection
+- [x] Admin endpoints (stats, users, payments, predictions)
+- [x] CSV auto-seeding on startup
 
 ### Frontend
-- [x] Landing page: Hero, Trust, How It Works, Features, Live Demo (card-style), Pricing (single ₹50), Testimonials, FAQ, Footer
-- [x] Pricing: Single ₹50 "Full Access Plan" card — no free tier
-- [x] College cards: Beautiful card grid (3 cols) with Safe/Target/Dream sections
-- [x] Card design: Badge, % chance, college name, branch, probability bar, cutoff rank, type, year, fees
-- [x] Paywall: Blurred card preview for non-premium with ₹50 CTA
-- [x] Auth: Login/Register with form validation
-- [x] Dashboard: Prediction form with 3 exam types, CRL rank labels
-- [x] AI Insight panel: Gemini AI badge, proper markdown rendering
-- [x] AI Counselor: Chat interface with markdown rendering, starter prompts
-- [x] Admin panel: Overview stats, users table, payments table, predictions table
+- [x] Landing page (Hero, Features, How It Works, ₹50-only Pricing, FAQ)
+- [x] Auth page with email/password + "Continue with Google" button
+- [x] Google OAuth callback handler in AuthContext (processes `#session_id=` hash)
+- [x] **PREMIUM GATE:** ProtectedRoute with `premiumRequired` — non-premium users auto-redirect to `/upgrade`
+- [x] `/upgrade` page: full-screen paywall with feature list, ₹50 CTA, Razorpay checkout, post-pay WhatsApp CTA
+- [x] Dashboard: prediction form, College Cards grid, AI Insight panel
+- [x] **TrendModal** wired to College Cards: click any card → opens modal with 2023–2025 bar+line chart, 3 year-cards with deltas, 2026 AI projection, trend badge (Easier/Tougher/Stable), "How to Read" explainer
+- [x] Sparkline component (unused on cards but available)
+- [x] AI Counselor chat page (markdown rendering, starter prompts)
+- [x] Admin panel
+- [x] **Removed "Made with Emergent" branding** (badge hidden, title = "Hynexs Edu Counseller | AI College Rank Predictor", CSS safety rule)
+- [x] Payment success modal with WhatsApp community CTA
 
-## Prioritized Backlog
+## Routing & Access Control
+| Route | Access |
+|-------|--------|
+| `/` | Public |
+| `/auth` | Public |
+| `/upgrade` | Logged-in users only |
+| `/dashboard` | Premium users + admins only |
+| `/counselor` | Premium users + admins only |
+| `/admin` | Admins only |
 
-### P0 - Critical (Done)
-- ✅ Auth flow (login/register)
-- ✅ Prediction engine for all 3 exam types
-- ✅ AI counseling insight
-- ✅ Payment integration
+## Test Credentials (see `/app/memory/test_credentials.md`)
+- Admin: `admin@hynexsedu.com` / `Admin@123` (premium=true)
+- Test user: `testuser@hynexsedu.com` / `Test@123` (premium=false → goes to /upgrade)
 
-### P1 - Important
-- [ ] Google OAuth integration
-- [ ] Better filtering (preferred branches, location)
-- [ ] More prediction results (currently limited to 10 per type)
-- [ ] Saved colleges (bookmark feature)
-- [ ] PDF report generation and download
-- [ ] WhatsApp Business API integration (currently just shows link)
+## Backlog
+### P1
+- [ ] Apply premium gate to `/saved` and `/reports` sub-views (currently inside dashboard)
+- [ ] Saved colleges bookmark feature (frontend list exists, backend pending)
+- [ ] PDF report generation & download
+- [ ] Better filtering (preferred branch, location)
+- [ ] Show more than 10 predictions per category
 
-### P2 - Nice to Have
-- [ ] TS EAMCET Phase 2 / Phase 3 cutoff data
-- [ ] Historical rank vs cutoff charts (visualization)
-- [ ] College ranking and placement data
-- [ ] Voice AI counselor (Vapi integration)
-- [ ] CSAB/Special Round predictions
-- [ ] Branch-wise comparison tool
-
-## Next Tasks
-1. Add Google OAuth (Emergent-managed)
-2. Implement saved colleges feature
-3. Add PDF report generation
-4. Add more filtering options (preferred location, branches)
-5. Improve prediction count (show more colleges per type)
+### P2
+- [ ] Admin PDF upload pipeline (OCR + RAG) for unstructured cutoff data
+- [ ] Historical placement data
+- [ ] CSAB / Special Round predictions
+- [ ] Voice AI Counselor
