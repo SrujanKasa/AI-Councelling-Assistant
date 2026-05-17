@@ -4,6 +4,10 @@ from typing import Optional, List
 from datetime import datetime, timezone
 from utils import get_current_user, classify_college
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from college_meta import (
+    BRANCH_GROUPS, match_branches, nirf_rank, college_type,
+    TYPE_PRIORITY, classify_5tier, CLASSIFICATION_ORDER, fee_estimate,
+)
 import os
 
 router = APIRouter(prefix="/api/predictions", tags=["predictions"])
@@ -55,12 +59,19 @@ class PredictRequest(BaseModel):
     rank: int
     category: str
     gender: str  # Male/Female
-    preferred_branches: Optional[List[str]] = None
-    quota: Optional[str] = "AI"  # JOSAA quota (AI = All India, OS = Outside State, HS = Home State)
+    quota: Optional[str] = "AI"  # AI = All India, OS = Outside State, HS = Home State
+    branches: Optional[List[str]] = None  # canonical branch labels from BRANCH_GROUPS
+    college_types: Optional[List[str]] = None  # ["NIT","IIIT","GFTI","Other"] (JEE_MAIN); ["IIT"] forced for JEE_ADV
 
 
 async def _get_db(request: Request):
     return request.app.state.db
+
+
+@router.get("/branches")
+async def list_branches():
+    """Canonical branch labels for the frontend filter chips."""
+    return {"branches": list(BRANCH_GROUPS.keys())}
 
 
 EXAM_LABELS = {
@@ -120,67 +131,63 @@ async def generate_ai_insight(rank: int, exam_type: str, category: str,
         )
 
 
+def _build_explanation(row: dict, ratio: float, label: str, exam_type: str, category: str, quota: str) -> str:
+    """One-line factual reason this college is in the user's results."""
+    closing = row.get("closing_rank") or row.get("last_rank") or 0
+    year = row.get("year", 2025)
+    if exam_type == "TSEAMCET":
+        ctx = f"TS EAMCET {category} cutoff ({year}) closed at rank {int(closing):,}"
+    else:
+        ctx = f"JoSAA {category}/{quota} cutoff ({year}) closed at rank {int(closing):,}"
+
+    if label == "Very Safe":
+        margin = int((ratio - 1.0) * 100)
+        return f"{ctx} — your rank beats it by ~{margin}%, so admission is highly likely."
+    if label == "Safe":
+        return f"{ctx} — your rank is comfortably under the cutoff with good margin."
+    if label == "Moderate":
+        return f"{ctx} — your rank is near the cutoff; round-by-round movement matters."
+    if label == "Competitive":
+        return f"{ctx} — your rank is slightly above last year's cutoff; depends on dip."
+    return f"{ctx} — your rank is above the cutoff; only realistic if cutoffs rise significantly."
+
+
 @router.post("/predict")
 async def predict(req: PredictRequest, request: Request):
     db = await _get_db(request)
 
-    # Optionally check auth (allow anonymous for demo)
+    # Optionally check auth (allow anonymous)
     user = None
     try:
         user = await get_current_user(request, db)
     except Exception:
         pass
 
-    results = []
+    raw_rows: list = []
 
+    # -----------------------------------------------------------------
+    # Fetch all eligible rows
+    # -----------------------------------------------------------------
     if req.exam_type == "TSEAMCET":
-        category = TS_CATEGORY_MAP.get(req.category, req.category)
+        ts_cat = TS_CATEGORY_MAP.get(req.category, req.category)
         gender_filter = "BOYS" if req.gender.lower() in ("male", "boys") else "GIRLS"
-
-        # Use most recent year data first, fall back to previous years
         query = {
             "year": {"$in": [2025, 2024, 2023]},
-            "category": category,
+            "category": ts_cat,
             "gender": gender_filter,
             "last_rank": {"$gt": 0},
         }
-
-        cursor = db.ts_eamcet_cutoffs.find(query, {"_id": 0}).sort([("year", -1), ("last_rank", 1)]).limit(2000)
-        rows = await cursor.to_list(2000)
-
-        # Get latest year per college+branch combination
-        best = {}
-        for row in rows:
-            key = (row.get("college_name", ""), row.get("branch_name", ""))
-            if key not in best or row.get("year", 0) > best[key].get("year", 0):
-                best[key] = row
-
-        for row in best.values():
-            closing_rank = row.get("last_rank", 0)
-            if closing_rank <= 0:
-                continue
-            cat, prob = classify_college(req.rank, closing_rank)
-            results.append({
-                "institute": row.get("college_name", "Unknown"),
-                "branch": row.get("branch_name", "Unknown"),
-                "college_code": row.get("college_code", ""),
-                "type": "TS EAMCET",
-                "category": cat,
-                "probability": prob,
-                "closing_rank": closing_rank,
-                "year": row.get("year", 2025),
-                "fees": "~₹35,000-₹1,20,000/year",
-            })
+        cursor = db.ts_eamcet_cutoffs.find(query, {"_id": 0}).sort(
+            [("year", -1), ("last_rank", 1)]
+        )
+        raw_rows = await cursor.to_list(length=None)
 
     elif req.exam_type in ("JEE_MAIN", "JEE_ADVANCED"):
         seat_type = JOSAA_SEAT_MAP.get(req.category, "OPEN")
         gender_filter = "Gender-Neutral"
         if req.gender.lower() in ("female", "girls"):
             gender_filter = "Female-only (including Supernumerary)"
-
         quota = req.quota or "AI"
-
-        # Fetch all matching rows first
         query = {
             "year": {"$in": [2025, 2024, 2023]},
             "seat_type": seat_type,
@@ -188,57 +195,98 @@ async def predict(req: PredictRequest, request: Request):
             "gender": gender_filter,
             "closing_rank": {"$gt": 0},
         }
+        cursor = db.josaa_cutoffs.find(query, {"_id": 0}).sort(
+            [("year", -1), ("closing_rank", 1)]
+        )
+        raw_rows = await cursor.to_list(length=None)
 
-        cursor = db.josaa_cutoffs.find(query, {"_id": 0}).sort([("year", -1), ("closing_rank", 1)]).limit(5000)
-        rows = await cursor.to_list(5000)
+    # -----------------------------------------------------------------
+    # Keep latest year per (college, branch); apply institute-type filter for JEE
+    # -----------------------------------------------------------------
+    best = {}
+    for row in raw_rows:
+        name = row.get("institute_name") or row.get("college_name", "")
+        if not name:
+            continue
+        if req.exam_type == "JEE_ADVANCED" and college_type(name) != "IIT":
+            continue
+        if req.exam_type == "JEE_MAIN" and college_type(name) == "IIT":
+            continue
+        branch = row.get("program_name") or row.get("branch_name", "")
+        key = (name, branch)
+        if key not in best or row.get("year", 0) > best[key].get("year", 0):
+            best[key] = row
 
-        best = {}
-        for row in rows:
-            name = row.get("institute_name", "")
-            # Filter by institute type based on exam_type
-            if req.exam_type == "JEE_ADVANCED" and not is_iit(name):
-                continue
-            if req.exam_type == "JEE_MAIN" and is_iit(name):
-                continue
+    # -----------------------------------------------------------------
+    # Build results with classification + filters
+    # -----------------------------------------------------------------
+    quota_used = req.quota or "AI"
+    selected_types = set(req.college_types or [])
+    if req.exam_type == "JEE_ADVANCED":
+        selected_types = {"IIT"}  # forced
 
-            key = (name, row.get("program_name", ""))
-            if key not in best or row.get("year", 0) > best[key].get("year", 0):
-                best[key] = row
+    results: list = []
+    for row in best.values():
+        name = row.get("institute_name") or row.get("college_name", "")
+        branch = row.get("program_name") or row.get("branch_name", "")
+        closing = row.get("closing_rank") or row.get("last_rank") or 0
+        if closing <= 0:
+            continue
 
-        for row in best.values():
-            closing_rank = row.get("closing_rank", 0)
-            if closing_rank <= 0:
-                continue
-            cat, prob = classify_college(req.rank, closing_rank)
-            institute_type = "IIT" if is_iit(row.get("institute_name", "")) else "NIT/IIIT/GFTI"
-            results.append({
-                "institute": row.get("institute_name", "Unknown"),
-                "branch": row.get("program_name", "Unknown"),
-                "type": institute_type,
-                "category": cat,
-                "probability": prob,
-                "closing_rank": closing_rank,
-                "opening_rank": row.get("opening_rank", 0),
-                "round": row.get("round", 1),
-                "year": row.get("year", 2025),
-                "fees": "~₹2,00,000-₹2,50,000/year" if is_iit(row.get("institute_name", "")) else "~₹1,25,000-₹1,50,000/year",
-                "quota": quota,
-            })
+        # branch filter (canonical groups)
+        if req.branches and not match_branches(branch, req.branches):
+            continue
 
-    # Sort: Safe first, then Target, then Dream; within each by probability desc
-    order = {"Safe": 0, "Target": 1, "Dream": 2, "Unknown": 3}
-    results.sort(key=lambda x: (order.get(x["category"], 3), -x["probability"]))
+        ctype = college_type(name)
+        if selected_types and ctype not in selected_types:
+            continue
 
-    safe = [r for r in results if r["category"] == "Safe"][:10]
-    target = [r for r in results if r["category"] == "Target"][:10]
-    dream = [r for r in results if r["category"] == "Dream"][:10]
+        ratio = closing / req.rank if req.rank else 0
+        label, prob = classify_5tier(req.rank, closing)
+        results.append({
+            "institute": name,
+            "branch": branch,
+            "type": "TS EAMCET" if req.exam_type == "TSEAMCET" else ctype,
+            "college_type": ctype,
+            "category": label,  # 5-tier label
+            "probability": round(prob, 1),
+            "closing_rank": int(closing),
+            "opening_rank": int(row.get("opening_rank", 0) or 0),
+            "round": row.get("round", 1),
+            "year": row.get("year", 2025),
+            "fees": fee_estimate(name, ctype),
+            "quota": quota_used if req.exam_type != "TSEAMCET" else None,
+            "nirf": nirf_rank(name),
+            "explanation": _build_explanation(row, ratio, label, req.exam_type, req.category, quota_used),
+            "college_code": row.get("college_code", ""),
+        })
 
-    # Generate AI insight
+    # -----------------------------------------------------------------
+    # Priority sort: classification → college_type → NIRF → probability
+    # -----------------------------------------------------------------
+    class_order = {lbl: i for i, lbl in enumerate(CLASSIFICATION_ORDER)}
+    results.sort(key=lambda r: (
+        class_order.get(r["category"], 99),
+        TYPE_PRIORITY.get(r["college_type"], 99),
+        r["nirf"],
+        -r["probability"],
+    ))
+
+    # Group buckets (no truncation)
+    grouped = {lbl: [] for lbl in CLASSIFICATION_ORDER}
+    for r in results:
+        grouped[r["category"]].append(r)
+
+    # Sample for AI insight (top 3 per realistic bucket)
+    sample_safe = grouped["Very Safe"][:3] + grouped["Safe"][:2]
+    sample_target = grouped["Moderate"][:3] + grouped["Competitive"][:2]
+    sample_dream = grouped["Difficult"][:3]
+
     ai_insight = await generate_ai_insight(
-        req.rank, req.exam_type, req.category, safe, target, dream
+        req.rank, req.exam_type, req.category, sample_safe, sample_target, sample_dream
     )
 
-    # Save prediction if user logged in
+    # Save prediction
     if user:
         pred_doc = {
             "user_id": user["uid"],
@@ -246,18 +294,38 @@ async def predict(req: PredictRequest, request: Request):
             "rank": req.rank,
             "category": req.category,
             "gender": req.gender,
-            "results": results[:30],
+            "branches": req.branches or [],
+            "college_types": list(selected_types),
+            "results_count": len(results),
             "ai_insight": ai_insight,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.predictions.insert_one(pred_doc)
 
+    # Back-compat fields (Safe/Target/Dream) for any legacy consumer
+    legacy_safe = grouped["Very Safe"] + grouped["Safe"]
+    legacy_target = grouped["Moderate"]
+    legacy_dream = grouped["Competitive"] + grouped["Difficult"]
+
     return {
-        "safe": safe,
-        "target": target,
-        "dream": dream,
-        "ai_insight": ai_insight,
+        "colleges": results,                  # full sorted list — all eligible
+        "groups": grouped,                    # by 5-tier label
+        "counts": {lbl: len(grouped[lbl]) for lbl in CLASSIFICATION_ORDER},
         "total": len(results),
+        "ai_insight": ai_insight,
+        "filters": {
+            "exam_type": req.exam_type,
+            "rank": req.rank,
+            "category": req.category,
+            "gender": req.gender,
+            "quota": quota_used,
+            "branches": req.branches or [],
+            "college_types": list(selected_types),
+        },
+        # Legacy 3-tier groupings (deprecated, kept for older clients)
+        "safe": legacy_safe,
+        "target": legacy_target,
+        "dream": legacy_dream,
     }
 
 

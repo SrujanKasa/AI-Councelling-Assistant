@@ -379,9 +379,39 @@ function PredictionForm({ user, onResults }) {
     category: user?.category || "OC",
     gender: "Male",
     quota: "AI",
+    branches: [],
+    college_types: [],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/predictions/branches`)
+      .then(r => setBranchOptions(r.data.branches || []))
+      .catch(() => setBranchOptions([]));
+  }, []);
+
+  const CTYPE_OPTIONS = ["NIT", "IIIT", "GFTI", "Other"];
+
+  const toggleBranch = (b) => {
+    setForm(f => ({
+      ...f,
+      branches: f.branches.includes(b)
+        ? f.branches.filter(x => x !== b)
+        : [...f.branches, b],
+    }));
+  };
+
+  const toggleCType = (t) => {
+    setForm(f => ({
+      ...f,
+      college_types: f.college_types.includes(t)
+        ? f.college_types.filter(x => x !== t)
+        : [...f.college_types, t],
+    }));
+  };
 
   const examConfig = {
     TSEAMCET: {
@@ -423,6 +453,8 @@ function PredictionForm({ user, onResults }) {
       rank: "",
       category: newCfg.categories[0],
       quota: "AI",
+      branches: [],
+      college_types: [],
     });
     setError("");
   };
@@ -432,9 +464,15 @@ function PredictionForm({ user, onResults }) {
     setError("");
     setLoading(true);
     try {
+      const payload = {
+        ...form,
+        rank: parseInt(form.rank),
+        branches: form.branches.length ? form.branches : null,
+        college_types: form.college_types.length ? form.college_types : null,
+      };
       const res = await axios.post(
         `${API}/predictions/predict`,
-        { ...form, rank: parseInt(form.rank) },
+        payload,
         { headers: getAuthHeaders() }
       );
       onResults(res.data, form);
@@ -558,6 +596,85 @@ function PredictionForm({ user, onResults }) {
         </div>
       </form>
 
+      {/* Advanced filters toggle */}
+      <div className="mt-5 pt-4 border-t border-slate-100">
+        <button
+          type="button"
+          data-testid="toggle-advanced-filters"
+          onClick={() => setShowAdvanced(s => !s)}
+          className="text-blue-600 text-xs font-semibold hover:text-blue-700 flex items-center gap-1"
+        >
+          {showAdvanced ? "Hide" : "Show"} advanced filters
+          <ChevronRight size={12} className={`transition-transform ${showAdvanced ? "rotate-90" : ""}`} />
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-4 space-y-4 animate-fade-in" data-testid="advanced-filters">
+            {/* Branches */}
+            <div>
+              <label className="text-slate-700 text-xs font-bold mb-2 block">
+                Preferred Branches
+                <span className="ml-2 font-normal text-slate-400">
+                  {form.branches.length ? `${form.branches.length} selected` : "all branches"}
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {branchOptions.map(b => {
+                  const active = form.branches.includes(b);
+                  return (
+                    <button
+                      type="button"
+                      key={b}
+                      data-testid={`branch-chip-${b}`}
+                      onClick={() => toggleBranch(b)}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-all ${
+                        active
+                          ? "bg-blue-500 text-white border-blue-500"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                      }`}
+                    >
+                      {b}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* College Type (only for JEE Main) */}
+            {form.exam_type === "JEE_MAIN" && (
+              <div>
+                <label className="text-slate-700 text-xs font-bold mb-2 block">
+                  College Type
+                  <span className="ml-2 font-normal text-slate-400">
+                    {form.college_types.length ? `${form.college_types.length} selected` : "all types"}
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CTYPE_OPTIONS.map(t => {
+                    const active = form.college_types.includes(t);
+                    return (
+                      <button
+                        type="button"
+                        key={t}
+                        data-testid={`ctype-chip-${t}`}
+                        onClick={() => toggleCType(t)}
+                        className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-all ${
+                          active
+                            ? "bg-purple-500 text-white border-purple-500"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-purple-300"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {error && (
         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs">
           {error}
@@ -614,9 +731,14 @@ function CollegeCard({ row, index, typeConfig, onClick }) {
           <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />
           Cutoff: <strong className="text-slate-600 ml-0.5">{row.closing_rank?.toLocaleString()}</strong>
         </span>
-        {row.type && (
-          <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
-            {row.type}
+        {row.college_type && row.college_type !== "Other" && (
+          <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">
+            {row.college_type}
+          </span>
+        )}
+        {row.nirf && row.nirf < 200 && (
+          <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+            NIRF #{row.nirf}
           </span>
         )}
         <span className="text-slate-400">{row.year}</span>
@@ -624,6 +746,13 @@ function CollegeCard({ row, index, typeConfig, onClick }) {
 
       {row.fees && row.fees !== "N/A" && (
         <p className="text-xs text-slate-400 mt-1.5 truncate">{row.fees}</p>
+      )}
+
+      {/* Why this college? */}
+      {row.explanation && (
+        <p className="mt-3 text-xs text-slate-500 leading-relaxed border-l-2 border-slate-200 pl-2 italic">
+          {row.explanation}
+        </p>
       )}
 
       {/* View Trend CTA */}
@@ -641,67 +770,133 @@ function CollegeCard({ row, index, typeConfig, onClick }) {
   );
 }
 
-function PredictionResults({ results, user, onPayment, examType, predForm }) {
+// Premium gating now handled at route-level (/upgrade redirect). All users
+// reaching this component already have full access.
+
+const TIER_CONFIG = {
+  "Very Safe": {
+    color: "text-emerald-700",
+    border: "border-emerald-200",
+    badge: "bg-emerald-100 text-emerald-700",
+    barColor: "bg-emerald-500",
+    sectionBg: "bg-gradient-to-r from-emerald-50 to-green-50",
+    sectionBorder: "border-emerald-200",
+    sectionTitle: "text-emerald-700",
+    icon: "✓✓",
+    description: "Admission near-certain based on cutoff history",
+  },
+  "Safe": {
+    color: "text-green-600",
+    border: "border-green-200",
+    badge: "bg-green-100 text-green-700",
+    barColor: "bg-green-500",
+    sectionBg: "bg-gradient-to-r from-green-50 to-lime-50",
+    sectionBorder: "border-green-200",
+    sectionTitle: "text-green-700",
+    icon: "✓",
+    description: "High probability — comfortable margin under cutoff",
+  },
+  "Moderate": {
+    color: "text-amber-600",
+    border: "border-amber-200",
+    badge: "bg-amber-100 text-amber-700",
+    barColor: "bg-amber-500",
+    sectionBg: "bg-gradient-to-r from-amber-50 to-yellow-50",
+    sectionBorder: "border-amber-200",
+    sectionTitle: "text-amber-700",
+    icon: "◎",
+    description: "Realistic — your rank is near the cutoff range",
+  },
+  "Competitive": {
+    color: "text-orange-600",
+    border: "border-orange-200",
+    badge: "bg-orange-100 text-orange-700",
+    barColor: "bg-orange-500",
+    sectionBg: "bg-gradient-to-r from-orange-50 to-amber-50",
+    sectionBorder: "border-orange-200",
+    sectionTitle: "text-orange-700",
+    icon: "▲",
+    description: "Stretch — depends on cutoff dip in your favour",
+  },
+  "Difficult": {
+    color: "text-rose-600",
+    border: "border-rose-200",
+    badge: "bg-rose-100 text-rose-700",
+    barColor: "bg-rose-500",
+    sectionBg: "bg-gradient-to-r from-rose-50 to-red-50",
+    sectionBorder: "border-rose-200",
+    sectionTitle: "text-rose-700",
+    icon: "✦",
+    description: "Long-shot — only if cutoffs rise significantly",
+  },
+};
+
+const TIER_ORDER = ["Very Safe", "Safe", "Moderate", "Competitive", "Difficult"];
+const PAGE_SIZE = 12;
+
+function TierSection({ tier, colleges, onCardClick }) {
+  const cfg = TIER_CONFIG[tier];
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  if (!colleges || colleges.length === 0) return null;
+
+  const shown = colleges.slice(0, visible);
+  const remaining = colleges.length - visible;
+
+  return (
+    <div data-testid={`tier-section-${tier.replace(/\s/g, "-")}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-t-xl border-t border-x ${cfg.sectionBorder} ${cfg.sectionBg}`}>
+        <span className={`text-xl ${cfg.color} font-bold`}>{cfg.icon}</span>
+        <div className="min-w-0">
+          <h3 className={`font-bold text-sm ${cfg.sectionTitle}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+            {tier}
+          </h3>
+          <p className="text-slate-500 text-xs hidden sm:block">{cfg.description}</p>
+        </div>
+        <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+          {colleges.length} colleges
+        </span>
+      </div>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 rounded-b-xl border ${cfg.sectionBorder} bg-white/60`}>
+        {shown.map((row, i) => (
+          <CollegeCard
+            key={`${row.institute}|${row.branch}|${i}`}
+            row={row}
+            index={`${tier}-${i}`}
+            typeConfig={TIER_CONFIG}
+            onClick={() => onCardClick(row)}
+          />
+        ))}
+      </div>
+      {remaining > 0 && (
+        <div className="flex justify-center mt-3">
+          <button
+            data-testid={`show-more-${tier.replace(/\s/g, "-")}`}
+            onClick={() => setVisible(v => v + PAGE_SIZE)}
+            className="text-blue-600 hover:text-blue-700 text-sm font-semibold bg-white border border-blue-200 hover:border-blue-400 rounded-full px-5 py-2 transition-colors flex items-center gap-1.5"
+          >
+            Show {Math.min(remaining, PAGE_SIZE)} more
+            <ChevronRight size={14} className="-mr-1" />
+            <span className="text-slate-400 text-xs">({remaining} hidden)</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PredictionResults({ results, examType, predForm }) {
   const [selectedCollege, setSelectedCollege] = useState(null);
   if (!results) return null;
 
-  const typeConfig = {
-    Safe: {
-      color: "text-green-600",
-      bg: "bg-green-50",
-      border: "border-green-200",
-      badge: "bg-green-100 text-green-700",
-      barColor: "bg-green-500",
-      sectionBg: "bg-gradient-to-r from-green-50 to-emerald-50",
-      sectionBorder: "border-green-200",
-      sectionTitle: "text-green-700",
-      icon: "✓",
-    },
-    Target: {
-      color: "text-amber-600",
-      bg: "bg-amber-50",
-      border: "border-amber-200",
-      badge: "bg-amber-100 text-amber-700",
-      barColor: "bg-amber-500",
-      sectionBg: "bg-gradient-to-r from-amber-50 to-yellow-50",
-      sectionBorder: "border-amber-200",
-      sectionTitle: "text-amber-700",
-      icon: "◎",
-    },
-    Dream: {
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-      border: "border-orange-200",
-      badge: "bg-orange-100 text-orange-700",
-      barColor: "bg-orange-500",
-      sectionBg: "bg-gradient-to-r from-orange-50 to-red-50",
-      sectionBorder: "border-orange-200",
-      sectionTitle: "text-orange-700",
-      icon: "★",
-    },
-  };
-
-  const limited = !user?.is_premium && user?.role !== "admin";
-  const totalShown = limited ? 8 : results.total;
-
   const examLabel = {
     TSEAMCET: "TS EAMCET",
-    JEE_MAIN: "JEE Main (NITs/IIITs)",
+    JEE_MAIN: "JEE Main (NITs/IIITs/GFTIs)",
     JEE_ADVANCED: "JEE Advanced (IITs)",
   }[examType] || examType;
 
-  // Distribute 8 slots among safe/target/dream proportionally
-  const safe = results.safe || [];
-  const target = results.target || [];
-  const dream = results.dream || [];
-
-  let safeFree = limited ? Math.min(safe.length, 3) : safe.length;
-  let targetFree = limited ? Math.min(target.length, 3) : target.length;
-  let dreamFree = limited ? Math.min(dream.length, 2) : dream.length;
-
-  const shownSafe = safe.slice(0, safeFree);
-  const shownTarget = target.slice(0, targetFree);
-  const shownDream = dream.slice(0, dreamFree);
+  // Use 5-tier groups from new API; gracefully fall back to legacy fields
+  const groups = results.groups || {};
+  const counts = results.counts || {};
 
   return (
     <div className="space-y-6" data-testid="prediction-results">
@@ -738,86 +933,40 @@ function PredictionResults({ results, user, onPayment, examType, predForm }) {
       )}
 
       {/* Stats bar */}
-      <div className="flex flex-wrap items-center gap-3 bg-white rounded-xl border border-slate-200 p-4">
-        <span className="text-slate-600 text-sm font-medium">{examLabel}</span>
-        <span className="text-slate-300">|</span>
-        {[
-          { key: "safe", count: safe.length, color: "text-green-600 bg-green-100", label: "Safe" },
-          { key: "target", count: target.length, color: "text-amber-600 bg-amber-100", label: "Target" },
-          { key: "dream", count: dream.length, color: "text-orange-600 bg-orange-100", label: "Dream" },
-        ].map((s) => (
-          <span key={s.key} className={`text-xs font-bold px-3 py-1 rounded-full ${s.color}`}>
-            {s.label}: {s.count}
-          </span>
-        ))}
-        <span className="ml-auto text-slate-400 text-xs">{results.total} total colleges found</span>
+      <div className="flex flex-wrap items-center gap-2 bg-white rounded-xl border border-slate-200 p-4">
+        <span className="text-slate-700 text-sm font-bold mr-2">{examLabel}</span>
+        {TIER_ORDER.map((tier) => {
+          const c = counts[tier] || 0;
+          if (c === 0) return null;
+          const cfg = TIER_CONFIG[tier];
+          return (
+            <span key={tier} className={`text-xs font-bold px-3 py-1 rounded-full ${cfg.badge}`}>
+              {tier}: {c}
+            </span>
+          );
+        })}
+        <span className="ml-auto text-slate-500 text-xs font-medium">
+          {results.total} colleges found
+        </span>
       </div>
 
-      {/* College card sections */}
-      {[
-        { key: "safe", label: "Safe Colleges", colleges: shownSafe, cfg: typeConfig.Safe },
-        { key: "target", label: "Target Colleges", colleges: shownTarget, cfg: typeConfig.Target },
-        { key: "dream", label: "Dream Colleges", colleges: shownDream, cfg: typeConfig.Dream },
-      ].map(({ key, label, colleges, cfg }) =>
-        colleges.length > 0 ? (
-          <div key={key}>
-            {/* Section header */}
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-t-xl border-t border-x ${cfg.sectionBorder} ${cfg.sectionBg}`}>
-              <span className={`text-xl ${cfg.color}`}>{cfg.icon}</span>
-              <h3 className={`font-bold text-sm ${cfg.sectionTitle}`} style={{ fontFamily: "Outfit, sans-serif" }}>
-                {label}
-              </h3>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.badge}`}>
-                {colleges.length} colleges
-              </span>
-            </div>
-            {/* Grid of cards */}
-            <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 rounded-b-xl border ${cfg.sectionBorder} bg-white/60`}>
-              {colleges.map((row, i) => (
-                <CollegeCard
-                  key={i}
-                  row={row}
-                  index={`${key}-${i}`}
-                  typeConfig={typeConfig}
-                  onClick={() => setSelectedCollege(row)}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null
-      )}
-
-      {/* Paywall */}
-      {limited && results.total > 8 && (
-        <div className="relative rounded-2xl overflow-hidden border-2 border-dashed border-blue-300">
-          {/* Blurred preview */}
-          <div className="blur-sm pointer-events-none grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 bg-slate-50">
-            {[...safe.slice(safeFree, safeFree + 3)].map((row, i) => (
-              <CollegeCard key={i} row={row} index={`hidden-${i}`} typeConfig={typeConfig} />
-            ))}
-          </div>
-          {/* Overlay */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm p-6 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
-              <Shield size={24} className="text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {results.total - 8} More Colleges Hidden
-            </h3>
-            <p className="text-slate-500 text-sm mb-5 max-w-xs">
-              Pay ₹50 once to unlock all {results.total} college predictions, full AI counseling, and personalized reports
-            </p>
-            <button
-              data-testid="unlock-premium-btn"
-              onClick={onPayment}
-              className="btn-primary px-8 py-3 text-base font-semibold"
-            >
-              Unlock All — ₹50 Only
-            </button>
-            <p className="text-slate-400 text-xs mt-3">One-time payment • No subscription • Instant access</p>
-          </div>
+      {/* No results state */}
+      {results.total === 0 && (
+        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center" data-testid="no-results">
+          <p className="text-slate-500 font-medium">No colleges match your filters</p>
+          <p className="text-slate-400 text-sm mt-1">Try removing branch or college-type filters to see more results.</p>
         </div>
       )}
+
+      {/* Tier sections (5-tier) */}
+      {TIER_ORDER.map((tier) => (
+        <TierSection
+          key={tier}
+          tier={tier}
+          colleges={groups[tier] || []}
+          onCardClick={setSelectedCollege}
+        />
+      ))}
 
       {/* Trend Modal */}
       {selectedCollege && (
@@ -1035,10 +1184,8 @@ export default function Dashboard() {
       {predictions && (
         <PredictionResults
           results={predictions}
-          user={user}
           examType={predForm?.exam_type}
           predForm={predForm}
-          onPayment={() => setShowPayment(true)}
         />
       )}
       {!predictions && (
