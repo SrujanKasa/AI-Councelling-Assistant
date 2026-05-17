@@ -67,7 +67,7 @@ function Navbar({ navigate }) {
                 onClick={() => navigate("/auth?tab=register")}
                 className="btn-primary text-sm"
               >
-                Get Started Free
+                Get Access — ₹50
               </button>
             </>
           )}
@@ -157,15 +157,15 @@ function HeroSection({ navigate }) {
           <div className="flex items-center gap-6 text-sm text-slate-400">
             <div className="flex items-center gap-1.5">
               <CheckCircle size={14} className="text-green-400" />
-              <span>Free predictions</span>
+              <span>3-year real data</span>
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle size={14} className="text-green-400" />
-              <span>3-year trend analysis</span>
+              <span>IITs + NITs + TS EAMCET</span>
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle size={14} className="text-green-400" />
-              <span>AI counseling</span>
+              <span>AI counseling — ₹50 only</span>
             </div>
           </div>
         </div>
@@ -534,37 +534,48 @@ function LiveDemo({ navigate }) {
           </div>
 
           {results && !results.error && (
-            <div className="space-y-3 animate-fade-in">
+            <div className="space-y-4 animate-fade-in">
               {results.ai_insight && (
                 <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                  <p className="text-blue-300 text-sm leading-relaxed">
-                    <Brain size={14} className="inline mr-2" />
-                    {results.ai_insight?.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').substring(0, 250)}...
+                  <div className="flex items-center gap-2 mb-1">
+                    <Brain size={14} className="text-blue-400" />
+                    <span className="text-blue-300 text-xs font-semibold uppercase tracking-wider">AI Insight</span>
+                  </div>
+                  <p className="text-blue-200 text-sm leading-relaxed">
+                    {results.ai_insight?.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').substring(0, 220)}...
                   </p>
                 </div>
               )}
-              <div className="grid sm:grid-cols-3 gap-3">
-                {["safe", "target", "dream"].map((type) => (
-                  <div key={type} className={`rounded-xl p-4 ${type === "safe" ? "bg-green-500/10 border border-green-500/20" : type === "target" ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-orange-500/10 border border-orange-500/20"}`}>
-                    <p className={`text-xs font-bold uppercase mb-2 ${type === "safe" ? "text-green-400" : type === "target" ? "text-yellow-400" : "text-orange-400"}`}>
-                      {type} ({results[type]?.length || 0})
-                    </p>
-                    {results[type]?.slice(0, 2).map((c, i) => (
-                      <div key={i} className="mb-2">
-                        <p className="text-white text-xs font-medium truncate">{c.institute}</p>
-                        <p className="text-slate-400 text-xs truncate">{c.branch?.substring(0, 35)}</p>
-                        <p className={`text-xs font-bold ${type === "safe" ? "text-green-400" : type === "target" ? "text-yellow-400" : "text-orange-400"}`}>
-                          {c.probability}% chance • Cutoff: {c.closing_rank?.toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
+              <div className="grid sm:grid-cols-3 gap-4">
+                {[
+                  { key: "safe", label: "Safe", color: "text-green-400", border: "border-green-500/30", bg: "bg-green-500/10", badge: "bg-green-500/20 text-green-300" },
+                  { key: "target", label: "Target", color: "text-amber-400", border: "border-amber-500/30", bg: "bg-amber-500/10", badge: "bg-amber-500/20 text-amber-300" },
+                  { key: "dream", label: "Dream", color: "text-orange-400", border: "border-orange-500/30", bg: "bg-orange-500/10", badge: "bg-orange-500/20 text-orange-300" },
+                ].map(({ key, label, color, border, bg, badge }) => (
+                  <div key={key} className={`rounded-xl border ${border} ${bg} overflow-hidden`}>
+                    <div className={`px-3 py-2 border-b ${border} flex items-center justify-between`}>
+                      <span className={`text-xs font-bold uppercase ${color}`}>{label}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${badge} font-medium`}>{results[key]?.length || 0}</span>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      {results[key]?.slice(0, 2).map((c, i) => (
+                        <div key={i} className="bg-white/5 rounded-lg p-2.5 border border-white/5">
+                          <p className="text-white text-xs font-semibold leading-snug">{c.institute}</p>
+                          <p className="text-slate-400 text-xs mt-0.5 truncate">{c.branch?.substring(0, 32)}</p>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className={`text-xs font-bold ${color}`}>{c.probability}%</span>
+                            <span className="text-slate-500 text-xs">Cutoff: {c.closing_rank?.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
               <p className="text-center text-slate-400 text-xs">
-                {results.total} colleges analyzed. Sign up to unlock all predictions →{" "}
-                <button onClick={() => navigate("/auth?tab=register")} className="text-blue-400 hover:underline">
-                  Free Account
+                {results.total} colleges found · Sign up to unlock all →{" "}
+                <button onClick={() => navigate("/auth?tab=register")} className="text-blue-400 hover:underline font-medium">
+                  Get Access — ₹50
                 </button>
               </p>
             </div>
@@ -582,86 +593,93 @@ function LiveDemo({ navigate }) {
 }
 
 function Pricing({ navigate }) {
-  const free = [
-    "Basic college predictions",
-    "5-minute trial access",
-    "3 AI counselor messages",
-    "Safe/Target/Dream view",
-  ];
-
-  const premium = [
-    "Unlimited predictions",
-    "Full AI counseling (unlimited)",
-    "Probability analysis",
-    "Personalized strategy report",
+  const features = [
+    "Unlimited college predictions",
+    "All 3 exam modes: TS EAPCET, JEE Main & JEE Advanced",
+    "Full AI counseling — unlimited messages",
+    "189,000+ JoSAA records (2023–2025)",
+    "52,000+ TS EAMCET records (2023–2025)",
+    "Safe / Target / Dream college cards",
+    "Probability score with trend analysis",
+    "Personalized AI counseling strategy",
     "Email report delivery",
     "WhatsApp community access",
     "Priority support",
-    "3-year trend analysis",
   ];
 
   return (
-    <section id="pricing" className="py-24 md:py-32 bg-slate-950/30" data-testid="pricing-section">
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center mb-16">
-          <p className="text-xs uppercase tracking-[0.2em] font-bold text-blue-400 mb-3">Pricing</p>
-          <h2 className="text-3xl md:text-4xl font-medium text-white tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Simple, Honest Pricing
-          </h2>
-          <p className="text-slate-400 mt-3">One payment. Lifetime access to premium tools.</p>
+    <section id="pricing" className="py-24 md:py-32" data-testid="pricing-section">
+      <div className="max-w-3xl mx-auto px-6 text-center">
+        <p className="text-xs uppercase tracking-[0.2em] font-bold text-blue-400 mb-3">Pricing</p>
+        <h2 className="text-3xl md:text-4xl font-medium text-white tracking-tight mb-4" style={{ fontFamily: "Outfit, sans-serif" }}>
+          One Price. Everything Included.
+        </h2>
+        <p className="text-slate-400 text-lg mb-12">
+          No subscriptions. No tiers. No tricks. Pay once, get everything.
+        </p>
+
+        {/* Single Premium Card */}
+        <div className="relative rounded-3xl overflow-hidden">
+          {/* Glow */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-700 blur-2xl opacity-40 scale-95" />
+
+          <div className="relative rounded-3xl border border-white/20 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-10">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-bold px-5 py-2 rounded-full mb-8">
+              <Sparkles size={14} />
+              Full Access Plan
+            </div>
+
+            {/* Price */}
+            <div className="mb-8">
+              <div className="flex items-baseline justify-center gap-2">
+                <span className="text-slate-400 text-2xl">₹</span>
+                <span className="text-7xl font-black text-white" style={{ fontFamily: "Outfit, sans-serif" }}>50</span>
+              </div>
+              <p className="text-slate-400 mt-2">One-time payment · Lifetime access</p>
+            </div>
+
+            {/* Features grid */}
+            <div className="grid sm:grid-cols-2 gap-3 mb-10 text-left">
+              {features.map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <CheckCircle size={11} className="text-blue-400" />
+                  </div>
+                  <span className="text-slate-300 text-sm">{item}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <div className="space-y-3">
+              <button
+                data-testid="premium-plan-btn"
+                onClick={() => navigate("/auth?tab=register")}
+                className="w-full py-4 text-lg font-bold text-white rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-all duration-200 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] glow-blue"
+              >
+                Get Full Access — ₹50
+              </button>
+              <p className="text-slate-500 text-sm">
+                Secure payment via Razorpay · Instant unlock
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Free */}
-          <div className="glass-card rounded-2xl p-8">
-            <p className="text-slate-400 text-sm font-medium mb-1">Free Plan</p>
-            <p className="text-4xl font-bold text-white mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>₹0</p>
-            <p className="text-slate-400 text-sm mb-8">Get started instantly</p>
-            <ul className="space-y-3 mb-8">
-              {free.map((item, i) => (
-                <li key={i} className="flex items-center gap-3 text-slate-300 text-sm">
-                  <CheckCircle size={16} className="text-slate-500 flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <button
-              data-testid="free-plan-btn"
-              onClick={() => navigate("/auth")}
-              className="btn-secondary w-full text-center"
-            >
-              Get Started Free
-            </button>
+        {/* Comparison hint */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-slate-400">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={14} className="text-green-400" />
+            Cheaper than 1 YouTube course
           </div>
-
-          {/* Premium */}
-          <div className="relative rounded-2xl p-8 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-bold px-4 py-1.5 rounded-full">
-                BEST VALUE
-              </span>
-            </div>
-            <p className="text-blue-300 text-sm font-medium mb-1">Premium Access</p>
-            <div className="flex items-baseline gap-2 mb-1">
-              <p className="text-4xl font-bold text-white" style={{ fontFamily: "Outfit, sans-serif" }}>₹50</p>
-              <span className="text-slate-400 text-sm">one-time</span>
-            </div>
-            <p className="text-slate-400 text-sm mb-8">Everything unlocked, forever</p>
-            <ul className="space-y-3 mb-8">
-              {premium.map((item, i) => (
-                <li key={i} className="flex items-center gap-3 text-slate-200 text-sm">
-                  <CheckCircle size={16} className="text-blue-400 flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <button
-              data-testid="premium-plan-btn"
-              onClick={() => navigate("/auth?tab=register")}
-              className="btn-primary w-full glow-blue"
-            >
-              Get Premium Access — ₹50
-            </button>
+          <div className="flex items-center gap-2">
+            <CheckCircle size={14} className="text-green-400" />
+            Saves 10+ hours of research
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle size={14} className="text-green-400" />
+            3 years of real cutoff data
           </div>
         </div>
       </div>

@@ -21,26 +21,27 @@ Build a production-ready AI-powered college counseling and rank prediction platf
 ## What's Implemented (MVP)
 
 ### Backend
-- [x] Auth: Email/Password JWT (register, login, me, logout)
+- [x] Auth: Email/Password JWT (register, login, me, logout) — Bearer token only
 - [x] Predictions: TS EAMCET, JEE Main (NITs/IIITs), JEE Advanced (IITs)
 - [x] Prediction engine: Safe/Target/Dream classification + probability scoring
 - [x] AI Insight: Gemini Flash generates personalized counseling advice per prediction
-- [x] AI Counselor: Chat endpoint with conversation history (Gemini Flash)
+- [x] AI Counselor: Chat endpoint with conversation history (Gemini Flash) + markdown
 - [x] Razorpay: Create order + verify payment (₹50 one-time)
 - [x] Resend email: Auto-send after payment
 - [x] Admin: Stats, users, payments, predictions
 - [x] Data seeding: CSV auto-loaded on startup
 
 ### Frontend
-- [x] Landing page: Hero, Trust, How It Works, Features, Live Demo, Pricing, Testimonials, FAQ, Footer
-- [x] Live Demo: 3 exam type tabs (TS EAPCET, JEE Main, JEE Advanced) with real predictions
+- [x] Landing page: Hero, Trust, How It Works, Features, Live Demo (card-style), Pricing (single ₹50), Testimonials, FAQ, Footer
+- [x] Pricing: Single ₹50 "Full Access Plan" card — no free tier
+- [x] College cards: Beautiful card grid (3 cols) with Safe/Target/Dream sections
+- [x] Card design: Badge, % chance, college name, branch, probability bar, cutoff rank, type, year, fees
+- [x] Paywall: Blurred card preview for non-premium with ₹50 CTA
 - [x] Auth: Login/Register with form validation
-- [x] Dashboard: Prediction form with 3 exam types, CRL rank labels, AI insight panel
-- [x] Predictions table: College, Branch, Type, Chance, Probability bar, Cutoff Rank, Year
+- [x] Dashboard: Prediction form with 3 exam types, CRL rank labels
+- [x] AI Insight panel: Gemini AI badge, proper markdown rendering
 - [x] AI Counselor: Chat interface with markdown rendering, starter prompts
 - [x] Admin panel: Overview stats, users table, payments table, predictions table
-- [x] Payment modal: Razorpay integration with ₹50 one-time payment
-- [x] Paywall: Shows 8 results for free users, all for premium
 
 ## Prioritized Backlog
 

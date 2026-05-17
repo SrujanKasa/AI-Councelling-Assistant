@@ -310,18 +310,105 @@ function PredictionForm({ user, onResults }) {
   );
 }
 
+function CollegeCard({ row, index, typeConfig }) {
+  const cfg = typeConfig[row.category] || typeConfig.Dream;
+
+  return (
+    <div
+      data-testid={`college-card-${index}`}
+      className={`relative rounded-2xl border-2 p-5 bg-white hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 ${cfg.border}`}
+    >
+      {/* Top row: chance badge + probability */}
+      <div className="flex items-start justify-between mb-3">
+        <span className={`text-xs font-bold px-3 py-1 rounded-full ${cfg.badge}`}>
+          {row.category}
+        </span>
+        <div className="text-right">
+          <span className={`text-2xl font-black ${cfg.color}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+            {row.probability}%
+          </span>
+          <p className="text-slate-400 text-xs leading-none">chance</p>
+        </div>
+      </div>
+
+      {/* College name */}
+      <h4 className="text-slate-900 font-bold text-sm leading-snug mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
+        {row.institute}
+      </h4>
+
+      {/* Branch */}
+      <p className="text-slate-500 text-xs mb-3 leading-relaxed">{row.branch}</p>
+
+      {/* Probability bar */}
+      <div className="w-full bg-slate-100 rounded-full h-1.5 mb-3">
+        <div
+          className={`h-1.5 rounded-full transition-all duration-500 ${cfg.barColor}`}
+          style={{ width: `${row.probability}%` }}
+        />
+      </div>
+
+      {/* Bottom metadata */}
+      <div className="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-1">
+        <span className="flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />
+          Cutoff: <strong className="text-slate-600 ml-0.5">{row.closing_rank?.toLocaleString()}</strong>
+        </span>
+        {row.type && (
+          <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
+            {row.type}
+          </span>
+        )}
+        <span className="text-slate-400">{row.year}</span>
+      </div>
+
+      {row.fees && row.fees !== "N/A" && (
+        <p className="text-xs text-slate-400 mt-1.5 truncate">{row.fees}</p>
+      )}
+    </div>
+  );
+}
+
 function PredictionResults({ results, user, onPayment, examType }) {
   if (!results) return null;
 
   const typeConfig = {
-    Safe: { color: "text-green-600", bg: "bg-green-50", border: "border-green-200", badge: "bg-green-100 text-green-700", barColor: "bg-green-500" },
-    Target: { color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", badge: "bg-yellow-100 text-yellow-700", barColor: "bg-yellow-500" },
-    Dream: { color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-100 text-orange-700", barColor: "bg-orange-500" },
+    Safe: {
+      color: "text-green-600",
+      bg: "bg-green-50",
+      border: "border-green-200",
+      badge: "bg-green-100 text-green-700",
+      barColor: "bg-green-500",
+      sectionBg: "bg-gradient-to-r from-green-50 to-emerald-50",
+      sectionBorder: "border-green-200",
+      sectionTitle: "text-green-700",
+      icon: "✓",
+    },
+    Target: {
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+      border: "border-amber-200",
+      badge: "bg-amber-100 text-amber-700",
+      barColor: "bg-amber-500",
+      sectionBg: "bg-gradient-to-r from-amber-50 to-yellow-50",
+      sectionBorder: "border-amber-200",
+      sectionTitle: "text-amber-700",
+      icon: "◎",
+    },
+    Dream: {
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+      border: "border-orange-200",
+      badge: "bg-orange-100 text-orange-700",
+      barColor: "bg-orange-500",
+      sectionBg: "bg-gradient-to-r from-orange-50 to-red-50",
+      sectionBorder: "border-orange-200",
+      sectionTitle: "text-orange-700",
+      icon: "★",
+    },
   };
 
-  const allResults = [...(results.safe || []), ...(results.target || []), ...(results.dream || [])];
   const limited = !user?.is_premium;
-  const displayed = limited ? allResults.slice(0, 8) : allResults;
+  const totalShown = limited ? 8 : results.total;
 
   const examLabel = {
     TSEAMCET: "TS EAMCET",
@@ -329,23 +416,45 @@ function PredictionResults({ results, user, onPayment, examType }) {
     JEE_ADVANCED: "JEE Advanced (IITs)",
   }[examType] || examType;
 
+  // Distribute 8 slots among safe/target/dream proportionally
+  const safe = results.safe || [];
+  const target = results.target || [];
+  const dream = results.dream || [];
+
+  let safeFree = limited ? Math.min(safe.length, 3) : safe.length;
+  let targetFree = limited ? Math.min(target.length, 3) : target.length;
+  let dreamFree = limited ? Math.min(dream.length, 2) : dream.length;
+
+  const shownSafe = safe.slice(0, safeFree);
+  const shownTarget = target.slice(0, targetFree);
+  const shownDream = dream.slice(0, dreamFree);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6" data-testid="prediction-results">
       {/* AI Insight */}
       {results.ai_insight && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Brain size={16} className="text-blue-500" />
-            <p className="text-blue-700 font-semibold text-sm">AI Counseling Insight — {examLabel}</p>
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <Brain size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-blue-800 font-bold text-sm">AI Counseling Insight</p>
+              <p className="text-blue-400 text-xs">{examLabel}</p>
+            </div>
+            <span className="ml-auto bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">
+              Gemini AI
+            </span>
           </div>
-          <div className="text-blue-800 text-sm leading-relaxed" data-testid="ai-insight-text">
+          <div className="text-blue-900 text-sm leading-relaxed" data-testid="ai-insight-text">
             <ReactMarkdown
               components={{
                 p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                strong: ({ children }) => <strong className="font-bold text-blue-900">{children}</strong>,
-                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                strong: ({ children }) => <strong className="font-bold text-blue-950">{children}</strong>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1 text-blue-800">{children}</ul>,
                 li: ({ children }) => <li>{children}</li>,
-                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1 text-blue-800">{children}</ol>,
+                h3: ({ children }) => <h3 className="font-bold text-blue-950 mb-1 mt-2">{children}</h3>,
               }}
             >
               {results.ai_insight}
@@ -354,124 +463,81 @@ function PredictionResults({ results, user, onPayment, examType }) {
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stats bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-white rounded-xl border border-slate-200 p-4">
+        <span className="text-slate-600 text-sm font-medium">{examLabel}</span>
+        <span className="text-slate-300">|</span>
         {[
-          { key: "safe", label: "Safe", icon: "✓" },
-          { key: "target", label: "Target", icon: "◎" },
-          { key: "dream", label: "Dream", icon: "★" },
-        ].map(({ key, label, icon }) => {
-          const cfg = typeConfig[label];
-          return (
-            <div key={key} className={`rounded-xl border p-4 ${cfg.bg} ${cfg.border}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-lg ${cfg.color}`}>{icon}</span>
-                <p className={`text-xs font-bold uppercase ${cfg.color}`}>{label}</p>
-              </div>
-              <p className={`text-3xl font-bold ${cfg.color}`} style={{ fontFamily: "Outfit, sans-serif" }}>
-                {results[key]?.length || 0}
-              </p>
-              <p className="text-slate-500 text-xs">colleges</p>
-            </div>
-          );
-        })}
+          { key: "safe", count: safe.length, color: "text-green-600 bg-green-100", label: "Safe" },
+          { key: "target", count: target.length, color: "text-amber-600 bg-amber-100", label: "Target" },
+          { key: "dream", count: dream.length, color: "text-orange-600 bg-orange-100", label: "Dream" },
+        ].map((s) => (
+          <span key={s.key} className={`text-xs font-bold px-3 py-1 rounded-full ${s.color}`}>
+            {s.label}: {s.count}
+          </span>
+        ))}
+        <span className="ml-auto text-slate-400 text-xs">{results.total} total colleges found</span>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <h4 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
-              College Predictions
-            </h4>
-            <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">
-              {examLabel}
-            </span>
+      {/* College card sections */}
+      {[
+        { key: "safe", label: "Safe Colleges", colleges: shownSafe, cfg: typeConfig.Safe },
+        { key: "target", label: "Target Colleges", colleges: shownTarget, cfg: typeConfig.Target },
+        { key: "dream", label: "Dream Colleges", colleges: shownDream, cfg: typeConfig.Dream },
+      ].map(({ key, label, colleges, cfg }) =>
+        colleges.length > 0 ? (
+          <div key={key}>
+            {/* Section header */}
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-t-xl border-t border-x ${cfg.sectionBorder} ${cfg.sectionBg}`}>
+              <span className={`text-xl ${cfg.color}`}>{cfg.icon}</span>
+              <h3 className={`font-bold text-sm ${cfg.sectionTitle}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                {label}
+              </h3>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                {colleges.length} colleges
+              </span>
+            </div>
+            {/* Grid of cards */}
+            <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 rounded-b-xl border ${cfg.sectionBorder} bg-white/60`}>
+              {colleges.map((row, i) => (
+                <CollegeCard key={i} row={row} index={`${key}-${i}`} typeConfig={typeConfig} />
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-slate-400 text-xs">{results.total} colleges found</span>
-            {limited && <span className="text-amber-500 text-xs font-medium">Showing 8 of {results.total}</span>}
+        ) : null
+      )}
+
+      {/* Paywall */}
+      {limited && results.total > 8 && (
+        <div className="relative rounded-2xl overflow-hidden border-2 border-dashed border-blue-300">
+          {/* Blurred preview */}
+          <div className="blur-sm pointer-events-none grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 bg-slate-50">
+            {[...safe.slice(safeFree, safeFree + 3)].map((row, i) => (
+              <CollegeCard key={i} row={row} index={`hidden-${i}`} typeConfig={typeConfig} />
+            ))}
           </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" data-testid="predictions-table">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">#</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">College</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Branch</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Chance</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Probability</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Cutoff Rank</th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Year</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayed.map((row, i) => {
-                const cfg = typeConfig[row.category] || typeConfig.Dream;
-                return (
-                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
-                    <td className="px-4 py-3 text-slate-800 font-medium max-w-xs">
-                      <p className="truncate">{row.institute}</p>
-                      {row.type && (
-                        <span className="text-xs text-slate-400">{row.type}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 max-w-xs">
-                      <p className="truncate text-xs">{row.branch}</p>
-                      {row.fees && row.fees !== "N/A" && (
-                        <p className="text-slate-400 text-xs">{row.fees}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-semibold ${cfg.badge}`}>
-                        {row.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 min-w-[80px]">
-                        <div className="w-16 bg-slate-200 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${cfg.barColor}`}
-                            style={{ width: `${row.probability}%` }}
-                          />
-                        </div>
-                        <span className={`font-bold text-xs ${cfg.color}`}>{row.probability}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 font-mono text-xs">
-                      {row.closing_rank?.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{row.year}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paywall */}
-        {limited && results.total > 8 && (
-          <div className="border-t border-dashed border-slate-300 p-6 text-center bg-gradient-to-b from-white to-slate-50">
-            <Shield size={24} className="text-blue-500 mx-auto mb-2" />
-            <p className="font-semibold text-slate-800 mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {results.total - 8} more colleges hidden
-            </p>
-            <p className="text-slate-500 text-sm mb-4">
-              Upgrade for ₹50 to unlock all {results.total} predictions + full AI counseling
+          {/* Overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm p-6 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+              <Shield size={24} className="text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {results.total - 8} More Colleges Hidden
+            </h3>
+            <p className="text-slate-500 text-sm mb-5 max-w-xs">
+              Pay ₹50 once to unlock all {results.total} college predictions, full AI counseling, and personalized reports
             </p>
             <button
               data-testid="unlock-premium-btn"
               onClick={onPayment}
-              className="btn-primary"
+              className="btn-primary px-8 py-3 text-base font-semibold"
             >
-              Unlock All Colleges — ₹50
+              Unlock All — ₹50 Only
             </button>
+            <p className="text-slate-400 text-xs mt-3">One-time payment • No subscription • Instant access</p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -635,15 +701,15 @@ export default function Dashboard() {
         <p className="text-blue-100 text-sm">
           {user?.is_premium
             ? "Premium access active. All features unlocked."
-            : "Free plan. Upgrade for full access."}
+            : "Get full access for ₹50 — one-time payment, no subscription."}
         </p>
         {!user?.is_premium && (
           <button
             data-testid="upgrade-banner-btn"
             onClick={() => setShowPayment(true)}
-            className="mt-3 bg-white text-blue-600 text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+            className="mt-3 bg-white text-blue-600 text-sm font-semibold px-5 py-2 rounded-lg hover:bg-blue-50 transition-colors"
           >
-            Upgrade to Premium — ₹50
+            Pay ₹50 — Get Full Access
           </button>
         )}
       </div>
@@ -652,7 +718,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Your Rank", value: user?.rank || "Not set", icon: TrendingUp, color: "text-blue-500" },
-          { label: "Premium Status", value: user?.is_premium ? "Active" : "Free", icon: Shield, color: "text-purple-500" },
+          { label: "Premium Status", value: user?.is_premium ? "Active" : "₹50", icon: Shield, color: "text-purple-500" },
           { label: "Predictions", value: predictions ? (predictions.total || 0) : "—", icon: Target, color: "text-green-500" },
           { label: "Exam Type", value: user?.exam_type || "Not set", icon: BarChart2, color: "text-orange-500" },
         ].map((stat, i) => (
