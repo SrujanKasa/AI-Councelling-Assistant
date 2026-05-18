@@ -859,7 +859,13 @@ function Footer({ navigate }) {
             <ul className="space-y-2">
               <li className="flex items-center gap-2 text-slate-400 text-sm">
                 <Mail size={14} />
-                support@hynexsedu.com
+                <a
+                  href="mailto:hynexsbusiness@gmail.com"
+                  className="hover:text-white transition-colors"
+                  data-testid="contact-email"
+                >
+                  hynexsbusiness@gmail.com
+                </a>
               </li>
               <li className="flex items-center gap-2 text-slate-400 text-sm">
                 <Phone size={14} />

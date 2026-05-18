@@ -231,7 +231,7 @@ export default function Upgrade() {
 
         <div className="text-center">
           <p className="text-slate-500 text-xs">
-            Need help? Email us at <a href="mailto:support@hynexsedu.com" className="text-blue-400 hover:underline">support@hynexsedu.com</a>
+            Need help? Email us at <a href="mailto:hynexsbusiness@gmail.com" className="text-blue-400 hover:underline">hynexsbusiness@gmail.com</a>
           </p>
         </div>
       </div>
