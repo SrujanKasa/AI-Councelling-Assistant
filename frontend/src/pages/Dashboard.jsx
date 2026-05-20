@@ -416,27 +416,30 @@ function PredictionForm({ user, onResults }) {
   const examConfig = {
     TSEAMCET: {
       label: "TS EAPCET",
-      rankLabel: "TS EAMCET Rank (CRL)",
-      rankPlaceholder: "e.g. 5000",
-      rankHelp: "Your common rank in TS EAMCET",
+      rankType: "category",
+      rankLabel: "Enter Category Rank",
+      rankPlaceholder: "Enter your category rank",
+      rankHelp: "Your TS EAMCET rank within your chosen category. Cutoffs are matched to the category you select below.",
       categories: ["OC", "BC_A", "BC_B", "BC_C", "BC_D", "BC_E", "SC", "ST", "EWS"],
       quota: null,
       example: "e.g. 5,000",
     },
     JEE_MAIN: {
       label: "JEE Main (NITs/IIITs)",
-      rankLabel: "JEE Main CRL Rank",
-      rankPlaceholder: "e.g. 50000",
-      rankHelp: "Common Rank List (CRL) from JEE Main",
+      rankType: "crl",
+      rankLabel: "Enter CRL Rank",
+      rankPlaceholder: "Enter your CRL rank",
+      rankHelp: "Common Rank List (CRL) from JEE Main — used for NITs, IIITs and GFTIs. Do not enter state rank or category rank.",
       categories: ["OPEN", "OBC-NCL", "EWS", "SC", "ST"],
       quota: true,
       example: "e.g. 50,000",
     },
     JEE_ADVANCED: {
       label: "JEE Advanced (IITs)",
-      rankLabel: "JEE Advanced CRL Rank",
-      rankPlaceholder: "e.g. 5000",
-      rankHelp: "Common Rank List (CRL) from JEE Advanced",
+      rankType: "crl",
+      rankLabel: "Enter CRL Rank",
+      rankPlaceholder: "Enter your CRL rank",
+      rankHelp: "Common Rank List (CRL) from JEE Advanced — required for IIT admissions only. Do not enter JEE Main rank.",
       categories: ["OPEN", "OBC-NCL", "EWS", "SC", "ST"],
       quota: true,
       example: "e.g. 5,000",
@@ -462,11 +465,24 @@ function PredictionForm({ user, onResults }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const numericRank = parseInt(form.rank, 10);
+    if (!form.rank || isNaN(numericRank) || numericRank < 1) {
+      setError(`Please enter a valid ${cfg.rankType === "category" ? "Category" : "CRL"} rank (positive number).`);
+      return;
+    }
+    if (cfg.rankType === "crl" && numericRank > 2500000) {
+      setError("CRL rank looks too large. Please double-check — JEE CRL ranks are typically below 25,00,000.");
+      return;
+    }
+    if (cfg.rankType === "category" && numericRank > 500000) {
+      setError("Category rank looks too large. Please double-check — TS EAMCET category ranks are typically below 5,00,000.");
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
         ...form,
-        rank: parseInt(form.rank),
+        rank: numericRank,
         branches: form.branches.length ? form.branches : null,
         college_types: form.college_types.length ? form.college_types : null,
       };
@@ -516,10 +532,7 @@ function PredictionForm({ user, onResults }) {
           <span className="text-white text-xs font-bold">i</span>
         </div>
         <p className="text-blue-700 text-xs leading-relaxed">
-          <strong>{cfg.rankLabel}:</strong> {cfg.rankHelp}.
-          {form.exam_type === "JEE_ADVANCED" && " IITs only accept JEE Advanced CRL rank — not JEE Main rank."}
-          {form.exam_type === "JEE_MAIN" && " NITs, IIITs and GFTIs use JEE Main CRL rank (not state rank)."}
-          {form.exam_type === "TSEAMCET" && " Telangana Engineering college cutoffs use TS EAMCET rank."}
+          <strong>{cfg.rankLabel}:</strong> {cfg.rankHelp}
         </p>
       </div>
 
@@ -684,8 +697,9 @@ function PredictionForm({ user, onResults }) {
   );
 }
 
-function CollegeCard({ row, index, typeConfig, onClick }) {
-  const cfg = typeConfig[row.category] || typeConfig.Dream;
+function CollegeCard({ row, index, typeConfig, bucket, onClick }) {
+  // bucket = display label (Safe/Moderate/Dream). row.category is internal 5-tier.
+  const cfg = typeConfig[bucket] || typeConfig.Dream;
 
   return (
     <div
@@ -696,10 +710,13 @@ function CollegeCard({ row, index, typeConfig, onClick }) {
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); }}
       className={`group relative rounded-2xl border-2 p-5 bg-white hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer ${cfg.border}`}
     >
-      {/* Top row: chance badge + probability */}
+      {/* Top row: bucket badge + probability */}
       <div className="flex items-start justify-between mb-3">
-        <span className={`text-xs font-bold px-3 py-1 rounded-full ${cfg.badge}`}>
-          {row.category}
+        <span
+          className={`text-xs font-bold px-3 py-1 rounded-full ${cfg.badge}`}
+          data-testid={`bucket-badge-${bucket}`}
+        >
+          {bucket}
         </span>
         <div className="text-right">
           <span className={`text-2xl font-black ${cfg.color}`} style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -773,28 +790,19 @@ function CollegeCard({ row, index, typeConfig, onClick }) {
 // Premium gating now handled at route-level (/upgrade redirect). All users
 // reaching this component already have full access.
 
+// User-facing 3-bucket display: Safe / Moderate / Dream
+// Backend still classifies into 5 internal tiers; we consolidate at display.
 const TIER_CONFIG = {
-  "Very Safe": {
-    color: "text-emerald-700",
-    border: "border-emerald-200",
-    badge: "bg-emerald-100 text-emerald-700",
-    barColor: "bg-emerald-500",
-    sectionBg: "bg-gradient-to-r from-emerald-50 to-green-50",
-    sectionBorder: "border-emerald-200",
-    sectionTitle: "text-emerald-700",
-    icon: "✓✓",
-    description: "Admission near-certain based on cutoff history",
-  },
   "Safe": {
-    color: "text-green-600",
+    color: "text-green-700",
     border: "border-green-200",
     badge: "bg-green-100 text-green-700",
     barColor: "bg-green-500",
-    sectionBg: "bg-gradient-to-r from-green-50 to-lime-50",
+    sectionBg: "bg-gradient-to-r from-green-50 to-emerald-50",
     sectionBorder: "border-green-200",
     sectionTitle: "text-green-700",
     icon: "✓",
-    description: "High probability — comfortable margin under cutoff",
+    description: "High probability — admission very likely based on past cutoffs",
   },
   "Moderate": {
     color: "text-amber-600",
@@ -805,33 +813,31 @@ const TIER_CONFIG = {
     sectionBorder: "border-amber-200",
     sectionTitle: "text-amber-700",
     icon: "◎",
-    description: "Realistic — your rank is near the cutoff range",
+    description: "Realistic chance — your rank is near the cutoff range",
   },
-  "Competitive": {
-    color: "text-orange-600",
-    border: "border-orange-200",
-    badge: "bg-orange-100 text-orange-700",
-    barColor: "bg-orange-500",
-    sectionBg: "bg-gradient-to-r from-orange-50 to-amber-50",
-    sectionBorder: "border-orange-200",
-    sectionTitle: "text-orange-700",
-    icon: "▲",
-    description: "Stretch — depends on cutoff dip in your favour",
-  },
-  "Difficult": {
+  "Dream": {
     color: "text-rose-600",
     border: "border-rose-200",
     badge: "bg-rose-100 text-rose-700",
     barColor: "bg-rose-500",
-    sectionBg: "bg-gradient-to-r from-rose-50 to-red-50",
+    sectionBg: "bg-gradient-to-r from-rose-50 to-pink-50",
     sectionBorder: "border-rose-200",
     sectionTitle: "text-rose-700",
-    icon: "✦",
-    description: "Long-shot — only if cutoffs rise significantly",
+    icon: "★",
+    description: "Stretch — only if cutoffs move favourably in your direction",
   },
 };
 
-const TIER_ORDER = ["Very Safe", "Safe", "Moderate", "Competitive", "Difficult"];
+// Map backend 5-tier label → 3-bucket display label
+const TIER_BUCKET = {
+  "Very Safe": "Safe",
+  "Safe": "Safe",
+  "Moderate": "Moderate",
+  "Competitive": "Dream",
+  "Difficult": "Dream",
+};
+
+const TIER_ORDER = ["Safe", "Moderate", "Dream"];
 const PAGE_SIZE = 12;
 
 function TierSection({ tier, colleges, onCardClick }) {
@@ -863,6 +869,7 @@ function TierSection({ tier, colleges, onCardClick }) {
             row={row}
             index={`${tier}-${i}`}
             typeConfig={TIER_CONFIG}
+            bucket={tier}
             onClick={() => onCardClick(row)}
           />
         ))}
@@ -894,9 +901,19 @@ function PredictionResults({ results, examType, predForm }) {
     JEE_ADVANCED: "JEE Advanced (IITs)",
   }[examType] || examType;
 
-  // Use 5-tier groups from new API; gracefully fall back to legacy fields
-  const groups = results.groups || {};
-  const counts = results.counts || {};
+  // Consolidate backend's 5-tier groups → 3 user-facing buckets (Safe / Moderate / Dream)
+  // Safest items appear first; within each bucket keep backend's priority sort.
+  const apiGroups = results.groups || {};
+  const buckets = { Safe: [], Moderate: [], Dream: [] };
+  ["Very Safe", "Safe", "Moderate", "Competitive", "Difficult"].forEach((tier) => {
+    const target = TIER_BUCKET[tier];
+    (apiGroups[tier] || []).forEach((row) => buckets[target].push(row));
+  });
+  const bucketCounts = {
+    Safe: buckets.Safe.length,
+    Moderate: buckets.Moderate.length,
+    Dream: buckets.Dream.length,
+  };
 
   return (
     <div className="space-y-6" data-testid="prediction-results">
@@ -932,11 +949,11 @@ function PredictionResults({ results, examType, predForm }) {
         </div>
       )}
 
-      {/* Stats bar */}
+      {/* Stats bar — 3 buckets in Safe → Moderate → Dream order */}
       <div className="flex flex-wrap items-center gap-2 bg-white rounded-xl border border-slate-200 p-4">
         <span className="text-slate-700 text-sm font-bold mr-2">{examLabel}</span>
         {TIER_ORDER.map((tier) => {
-          const c = counts[tier] || 0;
+          const c = bucketCounts[tier] || 0;
           if (c === 0) return null;
           const cfg = TIER_CONFIG[tier];
           return (
@@ -958,12 +975,12 @@ function PredictionResults({ results, examType, predForm }) {
         </div>
       )}
 
-      {/* Tier sections (5-tier) */}
+      {/* Bucket sections — Safe first, then Moderate, then Dream */}
       {TIER_ORDER.map((tier) => (
         <TierSection
           key={tier}
           tier={tier}
-          colleges={groups[tier] || []}
+          colleges={buckets[tier] || []}
           onCardClick={setSelectedCollege}
         />
       ))}
