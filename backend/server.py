@@ -19,8 +19,8 @@ from routes.admin import router as admin_router
 
 app = FastAPI(title="Hynexs AI Councellor API")
 
-mongo_url = os.environ["MONGO_URL"]
-db_name = os.environ["DB_NAME"]
+mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+db_name = os.environ.get("DB_NAME", "hynexs_counselor")
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
 
