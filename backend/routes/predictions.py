@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
 from utils import get_current_user, classify_college
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+import anthropic
+import os as _os
 from college_meta import (
     BRANCH_GROUPS, match_branches, nirf_rank, college_type,
     TYPE_PRIORITY, classify_5tier, CLASSIFICATION_ORDER, fee_estimate,
@@ -84,7 +85,6 @@ EXAM_LABELS = {
 async def generate_ai_insight(rank: int, exam_type: str, category: str,
                                safe: list, target: list, dream: list) -> str:
     try:
-        llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
         exam_label = EXAM_LABELS.get(exam_type, exam_type)
 
         if exam_type == "JEE_ADVANCED":
@@ -103,27 +103,27 @@ async def generate_ai_insight(rank: int, exam_type: str, category: str,
                 "Give precise, data-driven advice in 3-4 sentences. Be specific about Telangana college names."
             )
 
-        chat = LlmChat(
-            api_key=llm_key,
-            session_id=f"insight_{rank}_{category}_{exam_type}",
-            system_message=sys_msg,
-        ).with_model("gemini", "gemini-3-flash-preview")
+        client = anthropic.Anthropic(api_key=_os.environ.get("ANTHROPIC_API_KEY", ""))
 
         safe_list = [f"{r['institute']} - {r['branch']}" for r in safe[:3]]
         target_list = [f"{r['institute']} - {r['branch']}" for r in target[:3]]
         dream_list = [f"{r['institute']} - {r['branch']}" for r in dream[:3]]
 
-        msg = UserMessage(
-            text=(
-                f"Student rank: {rank} ({exam_label}), Category: {category}.\n"
-                f"Safe colleges: {', '.join(safe_list) if safe_list else 'None'}\n"
-                f"Target colleges: {', '.join(target_list) if target_list else 'None'}\n"
-                f"Dream colleges: {', '.join(dream_list) if dream_list else 'None'}\n"
-                "Generate personalized counseling advice: overall assessment, top 2 recommendations with reasoning, "
-                "branch vs college trade-off if applicable, and a clear risk strategy. Keep it factual and concise."
-            )
+        user_text = (
+            f"Student rank: {rank} ({exam_label}), Category: {category}.\n"
+            f"Safe colleges: {', '.join(safe_list) if safe_list else 'None'}\n"
+            f"Target colleges: {', '.join(target_list) if target_list else 'None'}\n"
+            f"Dream colleges: {', '.join(dream_list) if dream_list else 'None'}\n"
+            "Generate personalized counseling advice: overall assessment, top 2 recommendations with reasoning, "
+            "branch vs college trade-off if applicable, and a clear risk strategy. Keep it factual and concise."
         )
-        return await chat.send_message(msg)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            system=sys_msg,
+            messages=[{"role": "user", "content": user_text}]
+        )
+        return response.content[0].text
     except Exception as e:
         return (
             f"Based on your rank {rank} in {exam_label} under {category} category, "

@@ -2,10 +2,10 @@ from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from utils import get_current_user
-from emergentintegrations.llm.chat import LlmChat, UserMessage
 from datetime import datetime, timezone
 import os
 import uuid
+import anthropic
 
 router = APIRouter(prefix="/api/counselor", tags=["counselor"])
 
@@ -51,7 +51,6 @@ async def chat(req: ChatRequest, request: Request):
         pass
 
     if user and not user.get("is_premium"):
-        # Allow limited free messages
         conv_count = await db.conversations.count_documents({"user_id": user.get("uid", "")})
         msg_count = 0
         if conv_count > 0:
@@ -66,7 +65,6 @@ async def chat(req: ChatRequest, request: Request):
 
     session_id = req.session_id or str(uuid.uuid4())
 
-    # Build context
     context_parts = []
     if req.rank:
         context_parts.append(f"Student rank: {req.rank}")
@@ -75,7 +73,6 @@ async def chat(req: ChatRequest, request: Request):
     if req.exam_type:
         context_parts.append(f"Exam: {req.exam_type}")
 
-    # Get conversation history
     conv = None
     if user:
         conv = await db.conversations.find_one(
@@ -84,7 +81,7 @@ async def chat(req: ChatRequest, request: Request):
 
     history_text = ""
     if conv and conv.get("messages"):
-        recent = conv["messages"][-6:]  # Last 3 exchanges
+        recent = conv["messages"][-6:]
         history_text = "\n".join([
             f"{m['role'].upper()}: {m['content']}" for m in recent
         ])
@@ -96,22 +93,20 @@ async def chat(req: ChatRequest, request: Request):
         full_message = f"Previous conversation:\n{history_text}\n\nStudent: {req.message}"
 
     try:
-        llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
-        chat_client = LlmChat(
-            api_key=llm_key,
-            session_id=session_id,
-            system_message=SYSTEM_PROMPT,
-        ).with_model("gemini", "gemini-3-flash-preview")
-
-        user_msg = UserMessage(text=full_message)
-        ai_response = await chat_client.send_message(user_msg)
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": full_message}]
+        )
+        ai_response = response.content[0].text
     except Exception as e:
         ai_response = (
             "I'm having trouble connecting right now. Please try again in a moment. "
             f"Error: {str(e)[:100]}"
         )
 
-    # Save conversation
     if user:
         new_messages = [
             {"role": "user", "content": req.message, "timestamp": datetime.now(timezone.utc).isoformat()},
