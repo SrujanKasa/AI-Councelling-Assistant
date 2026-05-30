@@ -21,7 +21,7 @@ app = FastAPI(title="Hynexs AI Councellor API")
 
 mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 db_name = os.environ.get("DB_NAME", "hynexs_counselor")
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(mongo_url, tls=True, tlsAllowInvalidCertificates=True)
 db = client[db_name]
 
 app.state.db = db
