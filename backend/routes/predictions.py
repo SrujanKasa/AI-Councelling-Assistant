@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
 from utils import get_current_user, classify_college
-import anthropic
+import google.generativeai as genai
 import os as _os
 from college_meta import (
     BRANCH_GROUPS, match_branches, nirf_rank, college_type,
@@ -103,7 +103,11 @@ async def generate_ai_insight(rank: int, exam_type: str, category: str,
                 "Give precise, data-driven advice in 3-4 sentences. Be specific about Telangana college names."
             )
 
-        client = anthropic.Anthropic(api_key=_os.environ.get("ANTHROPIC_API_KEY", ""))
+        genai.configure(api_key=_os.environ.get("GEMINI_API_KEY", ""))
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=sys_msg
+        )
 
         safe_list = [f"{r['institute']} - {r['branch']}" for r in safe[:3]]
         target_list = [f"{r['institute']} - {r['branch']}" for r in target[:3]]
@@ -117,13 +121,8 @@ async def generate_ai_insight(rank: int, exam_type: str, category: str,
             "Generate personalized counseling advice: overall assessment, top 2 recommendations with reasoning, "
             "branch vs college trade-off if applicable, and a clear risk strategy. Keep it factual and concise."
         )
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=512,
-            system=sys_msg,
-            messages=[{"role": "user", "content": user_text}]
-        )
-        return response.content[0].text
+        response = model.generate_content(user_text)
+        return response.text
     except Exception as e:
         return (
             f"Based on your rank {rank} in {exam_label} under {category} category, "

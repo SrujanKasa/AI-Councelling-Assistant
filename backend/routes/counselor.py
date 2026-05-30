@@ -5,7 +5,7 @@ from utils import get_current_user
 from datetime import datetime, timezone
 import os
 import uuid
-import anthropic
+import google.generativeai as genai
 
 router = APIRouter(prefix="/api/counselor", tags=["counselor"])
 
@@ -43,7 +43,6 @@ When unsure, say "Based on recent trends..." rather than making up specific numb
 async def chat(req: ChatRequest, request: Request):
     db = await _get_db(request)
 
-    # Optional auth
     user = None
     try:
         user = await get_current_user(request, db)
@@ -93,14 +92,13 @@ async def chat(req: ChatRequest, request: Request):
         full_message = f"Previous conversation:\n{history_text}\n\nStudent: {req.message}"
 
     try:
-        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": full_message}]
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=SYSTEM_PROMPT
         )
-        ai_response = response.content[0].text
+        response = model.generate_content(full_message)
+        ai_response = response.text
     except Exception as e:
         ai_response = (
             "I'm having trouble connecting right now. Please try again in a moment. "
@@ -112,7 +110,6 @@ async def chat(req: ChatRequest, request: Request):
             {"role": "user", "content": req.message, "timestamp": datetime.now(timezone.utc).isoformat()},
             {"role": "assistant", "content": ai_response, "timestamp": datetime.now(timezone.utc).isoformat()},
         ]
-
         if conv:
             await db.conversations.update_one(
                 {"user_id": user["uid"], "session_id": session_id},

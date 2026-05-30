@@ -25,4 +25,4 @@ python-multipart>=0.0.9
 typer>=0.9.0
 razorpay==2.0.1
 resend==2.30.1
-anthropic>=0.40.0
+google-generativeai>=0.8.0
